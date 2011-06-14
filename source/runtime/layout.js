@@ -766,15 +766,21 @@ MemLayout.prototype.genMethods = function ()
             sourceStr += '\t"tachyon:arg size pint";\n';
         sourceStr += '\t"tachyon:ret ' + layout.ptrType + '";\n';
 
+        //Get the status of the event recording profiler (enabled/disabled)
+        sourceStr += '\tvar ctx = iir.get_ctx();\n';
+        sourceStr += '\tvar prof_enabled = get_ctx_profenable(ctx);\n';
+
         sourceStr += '\tvar ptr = heapAlloc(comp_size_' + layout.name + '(' +
                      (varSize? 'size':'') + '));\n';
 
         // Convert the layout pointer type as appropriate
         if (layout.ptrType === IRType.box){
             sourceStr += '\tptr = boxPtr(ptr, ' + layout.tagName + ');\n';
+            sourceStr += '\tif(prof_enabled) prof_recordBoxAlloc(' + layout.tagName + ');\n';
         }
         else if (layout.ptrType === IRType.ref){
             sourceStr += '\tptr = iir.icast(IRType.ref, ptr);\n';
+            sourceStr += '\tif(prof_enabled) prof_recordRefAlloc();\n';
         }
 
         // If the layout has a variable size, set its size
@@ -789,12 +795,15 @@ MemLayout.prototype.genMethods = function ()
         if (initCode)
             sourceStr += indentText(initCode);
 
+        sourceStr += '\tif(prof_enabled) prof_recordAlloc();\n';
+
         sourceStr += '\treturn ptr;\n';
         sourceStr += '}\n';
         sourceStr += '\n';
 
         return sourceStr
     }
+
 
     // Generate the allocation function with initialization
     sourceStr += genAllocCode('alloc', this, initCode);

@@ -307,6 +307,227 @@ function ast_walk_exprs(asts, ctx)
 
 //-----------------------------------------------------------------------------
 
+// Pass 0.
+//
+// Adds profiling instrumentation to function declarations
+
+function ast_pass0_ctx(userFiles)
+{
+    this.userFiles = userFiles;    //Files corresponding to the user program
+    this.funcDeclId = undefined;        //The id of the function declaration encapsulating the function expression intrumentalized
+    this.args = [];
+    this.inCallExpr = false;       //True during parsing of a function call
+    this.depth = 0;                //The depth of the latest function call
+    this.calls_per_depth = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];  //Array tracking the number of function calls per depth (< 20)
+}
+
+
+ast_pass0_ctx.prototype.walk_statement = function (ast)
+{
+    if (ast === null)
+    {
+        // no transformation
+        return ast;
+    }
+
+    //TODO: Call to a primitive for a "Function calls/depth" report
+    else if (ast instanceof Program) {
+        ast_walk_statement(ast, this);
+
+        var print = "prof_recordFuncCallsPerDepth([" + this.calls_per_depth + "]);";
+
+        var s = new Scanner(new String_input_port(print));
+        var p = new Parser(s, false);
+        var prog = p.parse();
+
+        ast.block.statements = ast.block.statements.concat(prog.block.statements);
+        return ast;
+    }
+
+    else if (ast instanceof ExprStatement)
+    {
+        ast.expr = this.walk_expr(ast.expr);
+        return ast;
+    }
+
+    else if (ast instanceof FunctionDeclaration)
+    {
+        //Remember the function's id 
+        this.funcDeclId = ast.id.toString();
+
+        ast.funct = this.walk_expr(ast.funct);
+        return ast;
+    }
+
+    //Function return statement instrumentalization
+    else if (ast instanceof ReturnStatement)
+    {        
+        ast.expr = this.walk_expr(ast.expr);
+
+        if (!this.filter_prof(ast))
+        {
+            return ast;
+        }
+
+        else if (ast.expr !== null)
+        {
+            //If the return value is a variable (reference), insert call to "prof_recordFuncStop" primitive before return
+            if(ast.expr instanceof Ref || ast.expr instanceof Literal)
+                return new BlockStatement(ast.loc,
+                    [new ExprStatement(ast.loc, 
+                        new CallExpr(ast.loc,
+                            new Ref(ast.loc, new Token(IDENT_CAT, "prof_recordFuncStop", ast.loc)),
+                            [new CallExpr(ast.loc, 
+                                 new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), [])
+                            ]
+                        )
+                    ), 
+                    ast]
+                );
+            //Else, store return value in an inserted variable, insert call to "prof_recordFuncStop" primitive before returning value of inserted variable
+            else{
+                var returnValueId = get_free_id("returnValue", ast.loc);
+
+                return new BlockStatement(ast.loc,
+                    [new VariableStatement(ast.loc,
+                        [
+                            new Decl(
+                                ast.loc,
+                                returnValueId,
+                                ast.expr
+                            )
+                        ]
+                     ),
+                     new ExprStatement(ast.loc, 
+                         new CallExpr(ast.loc,
+                            new Ref(ast.loc, new Token(IDENT_CAT, "prof_recordFuncStop", ast.loc)),
+                            [new CallExpr(ast.loc, 
+                                 new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), [])
+                             //new Ref(ast.loc, new Token(IDENT_CAT, this.args.pop(), ast.loc))
+                            ]
+                        )), 
+                     new ReturnStatement(ast.loc,
+                         new Ref(ast.loc, new Token(IDENT_CAT, returnValueId, ast.loc)))
+                    ]
+                );
+            }
+        }
+        
+    }
+    else
+    {
+        return ast_walk_statement(ast, this);
+    }
+};
+
+ast_pass0_ctx.prototype.walk_expr = function (ast)
+{
+    if (ast === null)
+    {
+        // no transformation
+        return ast;
+    }
+
+    //Function body instrumentalization
+    else if (ast instanceof FunctionExpr)
+    {
+
+        ast_walk_statements(ast.body, this);
+
+        if (this.filter_prof(ast))
+        {
+           //Record the entering of the function
+           ast.body.unshift(
+                new ExprStatement(ast.loc, 
+                    new CallExpr(
+                        ast.loc,
+                        new Ref(ast.loc, new Token(IDENT_CAT, "prof_recordFuncStart", ast.loc)),
+                        [new CallExpr(ast.loc, new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), []),
+                         new Literal(ast.loc, this.funcDeclId),
+                         new Literal(ast.loc, ast.loc.to_string())
+//                         new Ref(ast.loc, new Token(IDENT_CAT, ast.params.toString(), ast.loc))
+                        ]
+                    )
+                )
+           );
+           this.funcDeclId = undefined;
+            
+
+           //Record the exiting of the function (if no return statement was encountered during its execution)
+           ast.body.push(
+                new ExprStatement(ast.loc, 
+                    new CallExpr(ast.loc,
+                        new Ref(ast.loc, new Token(IDENT_CAT, "prof_recordFuncStop", ast.loc)),
+                        [new CallExpr(ast.loc, 
+                             new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), [])
+                        ]
+                    )
+                )
+            );
+        }
+
+        // Return the instrumentalized function
+        return ast;
+    }
+
+    
+    else if (ast instanceof CallExpr)
+    {
+        //In Call Expression => enable tracking of depth of function call
+        if(ast.fn instanceof OpExpr){
+            this.inCallExpr = true;
+
+            ast.fn = this.walk_expr(ast.fn);
+            ast.args = ast_walk_exprs(ast.args, this);
+
+
+            if(this.depth < 20)
+                this.calls_per_depth[this.depth] += 1;
+            this.depth = 0;
+        }
+        else{
+            ast.fn = this.walk_expr(ast.fn);
+            ast.args = ast_walk_exprs(ast.args, this);
+            this.calls_per_depth[0] += 1;
+        }
+
+        //End of Call Expression => disable tracking of depth of function call
+        this.inCallExpr = false;
+
+        return ast;
+    }
+
+    //Each OpExpr of "op" attribute 'x [ y ]' in CallExpr corresponds to a propertie reference => increment depth
+    else if (ast instanceof OpExpr)
+    {
+        if(this.inCallExpr && ast.op === 'x [ y ]')
+            this.depth++;
+        ast.exprs = ast_walk_exprs(ast.exprs, this);
+        return ast;
+    }
+
+    else
+    {
+        return ast_walk_expr(ast, this);
+    }
+};
+
+//Profiling filter: instrumentalization of user code only
+ast_pass0_ctx.prototype.filter_prof = function (ast)
+{
+    if (this.userFiles.indexOf(ast.loc.filename) != -1)
+        return true;
+    return false;
+};
+
+function ast_pass0(ast, userFiles)
+{
+    var ctx = new ast_pass0_ctx(userFiles);
+    ctx.walk_statement(ast);
+}
+
+//-----------------------------------------------------------------------------
+
 // Pass 1.
 //
 // Adds debugging traces.
@@ -1068,8 +1289,12 @@ function ast_pass5(ast)
 
 //-----------------------------------------------------------------------------
 
-function ast_normalize(ast, debug)
+function ast_normalize(ast, debug, profiling, userFiles)
 {
+    // If profiling mode enabled, instrumentalize the code to produce function call report
+    if (profiling)
+        ast_pass0(ast, userFiles);
+
     if (debug)
         ast_pass1(ast);
     ast_pass2(ast);
@@ -1079,5 +1304,6 @@ function ast_normalize(ast, debug)
 
     return ast;
 }
+
 
 //=============================================================================
