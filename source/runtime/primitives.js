@@ -548,6 +548,11 @@ function heapAlloc(size)
     // If this allocation exceeds the heap limit
     if (nextPtr >= heapLimit)
     {
+            prof_allocReport();
+            prof_propGetReport();
+            prof_propPutReport();
+            prof_funcCallReport();
+            prof_funcCallsPerDepthReport();	
         //printInt(pint(1111111));
 
         // Log that we are going to perform GC

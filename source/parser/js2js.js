@@ -57,6 +57,8 @@ function main()
     var opt_warn = false;
     var opt_ast = false;
     var opt_nojs = false;
+    var opt_eventrec = false;
+    var files = [];
     var i = 0;
 
     while (i < args.length)
@@ -69,6 +71,8 @@ function main()
             opt_ast = true;
         else if (args[i] === "-nojs")
             opt_nojs = true;
+        else if (args[i] === "-eventrec")
+            opt_eventrec = true;
         else
             break;
         i++;
@@ -77,6 +81,7 @@ function main()
     while (i < args.length)
     {
         var filename = args[i];
+        files.push(filename);
         var port = new File_input_port(filename);
         var s = new Scanner(port);
         var p = new Parser(s, opt_warn);
@@ -91,7 +96,7 @@ function main()
                            new BlockStatement(prog.loc,
                                               Array.prototype.concat.apply([], statements)));
 
-        var normalized_prog = ast_normalize(prog, opt_debug);
+        var normalized_prog = ast_normalize(prog, opt_debug, opt_eventrec, files);
 
         if (opt_ast)
             pp(normalized_prog);
