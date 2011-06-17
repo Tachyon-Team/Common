@@ -842,6 +842,26 @@ tests.programs.stdlib_math = genTest(
 );
 
 /**
+Simple object access performance test.
+*/
+tests.programs.perf_obj_access = genTest(
+    'programs/perf_obj_access/perf_obj_access.js',
+    'test',
+    [],
+    0
+);
+
+/**
+Simple array access performance test.
+*/
+tests.programs.perf_arr_access = genTest(
+    'programs/perf_arr_access/perf_arr_access.js',
+    'test',
+    [],
+    0
+);
+
+/**
 Tests for sunspider.
 */
 tests.programs.sunspider = tests.testSuite();

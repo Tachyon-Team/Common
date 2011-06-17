@@ -93,7 +93,7 @@ Date.prototype.constructor = Date;
 Date.prototype.getTime = function ()
 {
     return currentTimeMillis();
-}
+};
 
 //15.9.5.10 Date.prototype.getFullYear()
 //15.9.5.11 Date.prototype.getUTCFullYear()
