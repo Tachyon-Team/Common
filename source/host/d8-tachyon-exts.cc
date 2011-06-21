@@ -134,6 +134,19 @@
 
 /*---------------------------------------------------------------------------*/
 
+v8::Handle<v8::Value> v8Proxy_hostIs64bit(const v8::Arguments& args)
+{
+    if (args.Length() != 0)
+    {
+        printf("Error in hostIs64bit -- 0 arguments expected\n");
+        exit(1);
+    }
+
+    int is64bit = (sizeof(void*) == 8);
+
+    return v8::Boolean::New(is64bit);
+}
+
 v8::Handle<v8::Value> v8Proxy_writeFile(const v8::Arguments& args)
 {
     if (args.Length() != 2)
@@ -742,6 +755,11 @@ v8::Handle<v8::Value> pauseV8Profile(const v8::Arguments& args)
 void init_d8_extensions(v8::Handle<v8::ObjectTemplate> global_template)
 {
     initTachyonExts();
+
+    global_template->Set(
+        v8::String::New("hostIs64bit"), 
+        v8::FunctionTemplate::New(v8Proxy_hostIs64bit)
+    );
 
     global_template->Set(
         v8::String::New("writeFile"), 
