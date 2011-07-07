@@ -100,9 +100,9 @@ STDLIB_SRCS =                           \
     stdlib/boolean.js                   \
     stdlib/number.js                    \
     stdlib/string.js                    \
-    stdlib/regexp/re-parser.js          \
-    stdlib/regexp/re-graph.js           \
-    stdlib/regexp/re-asttograph.js      \
+    stdlib/regexp/parser.js             \
+    stdlib/regexp/automata.js           \
+    stdlib/regexp/ast-to-automata.js    \
     stdlib/regexp.js                    \
     stdlib/math.js                      \
     stdlib/date.js                      \
