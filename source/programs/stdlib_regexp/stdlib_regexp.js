@@ -157,7 +157,7 @@ function test_quantifier ()
         return false;
     if (!check_equal_matches(new RegExp("(x*)*").exec("xxx"), ["xxx", "xxx"]))
         return false;
-    if (!check_equal_matches(new RegExp("(a*)*").exec("b"), ["",undefined]))
+    if (!check_equal_matches(new RegExp("(a*)*").exec("b"), ["", ""]))
         return false;
     if (!check_equal_matches(new RegExp("(((x*)*)*)*").exec("xxx"), ["xxx", "xxx", "xxx", "xxx"]))
         return false;

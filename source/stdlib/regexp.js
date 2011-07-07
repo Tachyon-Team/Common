@@ -40,39 +40,44 @@
  * _________________________________________________________________________
  */
 
-var REDEBUG = false;
+var REGEXPDEBUG = false;
 
 function RegExp (
     pattern,
     flags
 )
 {
-    this.source = pattern === undefined ? "" : pattern;
+    this.source = (pattern === undefined ? "" : pattern);
     this.global = false;
     this.ignoreCase = false;
     this.multiline = false;
     this.lastIndex = 0;
 
-    // TODO: SyntaxError throwing as defined in ECMA-262 15.10.4.1
-    if (typeof flags === "string")
+    // Extract flags.
+    if (flags !== undefined)
     {
         for (var i = 0; i < flags.length; ++i)
+        {        
             if (flags.charCodeAt(i) === 103) // 'g'
+            {
                 this.global = true;
+            }
             else if (flags.charCodeAt(i) === 105) // 'i'
+            {
                 this.ignoreCase = true;
+            }
             else if (flags.charCodeAt(i) === 109) // 'm'
+            {
                 this.multiline = true;
+            }
+        }
     }
 
-    var ast = new REParser().parse(pattern); 
-    this.graph = new REAstToGraph().compile(ast, this.global, this.ignoreCase,
-                                            this.multiline);
+    // Parse pattern and compile it to an automata.
+    var ast = new RegExpParser().parse(pattern); 
+    this._automata = astToAutomata(ast, this.global, this.ignoreCase, this.multiline);
 }
 
-/**
-    Anonymous function to initialize this library
-*/
 (function ()
 {
     // Get a reference to the context
@@ -86,69 +91,104 @@ RegExp.prototype.exec = function (
     input
 )
 {
-    var context = new REContext(input, this.graph.rootGroup);
-    var cursor = this.graph.head;
-    var padding = this.lastIndex;
-    var i = 0;
-    var next = cursor;
+    var context = new RegExpContext(input, this._automata.captures);
+    var padding = 0;
+    var currentNode = this._automata.headNode;
+    var nextNode = currentNode;
 
-    context.index = this.lastIndex;
-    while (next !== null ||
-           padding < input.length || context.btstack.length > 0)
-    {
-        next = null;
+    do {
+        currentNode = this._automata.headNode;
+        context.setIndex(this.lastIndex + padding);
 
-        for (; i < cursor.edges.length; ++i)
+        while (true)
         {
-            var contextSave;
-            if (cursor.edges.length > 1)
-                contextSave = context.dump();
-            var btactive = context.btactive;
+            nextNode = currentNode.step(context);
 
-            next = cursor.edges[i].exec(context);
-
-            if (next instanceof RENode)
+            if (nextNode === null)
             {
-                if (i < cursor.edges.length - 1 && btactive === 0)
-                    context.btstack.push([cursor, i, contextSave]);
-                cursor = next;
-                i = 0;
-                break;
-            }
-        } 
+                // Build match array if there's no next step but the current node is final.
+                if (currentNode._final)
+                {
+                    if (this.global)
+                        this.lastIndex = context.index;
 
-        if (next === null)
-        {
-            if (cursor._final)
-            {
-                if (this.global)
-                    this.lastIndex = context.index;
-                return context.extractCaptures(input);
+                    var matches = new Array(this._automata.captures.length);
+
+                    for (var i = 0; i < this._automata.captures.length; ++i)
+                    {
+                        var capture = this._automata.captures[i];
+
+                        if (capture.start >= 0)
+                            matches[i] = input.substring(capture.start, capture.end);
+                        else
+                            matches[i] = undefined;
+                    }
+                    return matches;
+                }
+
+                // Backtrack context until a backtrack succeded or backtrack stack is empty.
+                do {
+                    nextNode = context.getBTNode();
+                } while (nextNode && !nextNode.backtrack(context));
+
+                if (!nextNode)
+                {
+                    ++padding;
+                    break;
+                }
             }
 
-            if (context.btstack.length > 0)
-            {
-                if (REDEBUG)
-                    print("### backtracking ...");
-                var btinfo = context.btstack.pop();
-
-                cursor = btinfo[0];
-                next = cursor;
-                i = btinfo[1] + 1;
-                context.restore(btinfo[2]);
-                context.btactive = 0;
-            }
-            else
-            {
-                i = 0;
-                cursor = this.graph.head;
-                padding++;
-                context.index = padding;
-                context.activeCaps = [];
-            }
+            currentNode = nextNode;
         }
-    } 
+    } while (this.lastIndex + padding < input.length);
+
     this.lastIndex = 0;
-    return null; 
+    return null;
+}
+
+RegExp.prototype.test = function (
+    input
+)
+{
+    var context = new RegExpContext(input, this._automata.captures);
+    var padding = 0;
+    var currentNode = this._automata.headNode;
+    var nextNode = currentNode;
+
+    do {
+        currentNode = this._automata.headNode;
+        context.setIndex(this.lastIndex + padding);
+
+        while (true)
+        {
+            nextNode = currentNode.step(context);
+
+            if (nextNode === null)
+            {
+                if (currentNode._final)
+                {
+                    if (this.global)
+                        this.lastIndex = context.index;
+                    return true;
+                }
+
+                // Backtrack context until a backtrack succeded or backtrack stack is empty.
+                do {
+                    nextNode = context.getBTNode();
+                } while (nextNode && !nextNode.backtrack(context));
+
+                if (!nextNode)
+                {
+                    ++padding;
+                    break;
+                }
+            }
+
+            currentNode = nextNode;
+        }
+    } while (this.lastIndex + padding < input.length);
+
+    this.lastIndex = 0;
+    return null;
 }
 
