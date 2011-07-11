@@ -68,7 +68,7 @@ function AstToAutomataContext (
 
 /**
     Preemptly build group and captures structures from a regexp ast.
-    The result is stored into groups.
+    The result is stored into <groups> arguments of type Array.
 */
 function buildGroups (
     ast,
@@ -132,31 +132,63 @@ function astToAutomata (
     var context;
 
     buildGroups(ast, groups, []);
+
+    // Create context with flags.
     context = new AstToAutomataContext(groups, global, ignoreCase, multiline);
+
+    // Set the transition of the head node to the result of the
+    // compilation of the root disjunction.
     headNode.transition = disjunctionToAutomata(ast, false, context);
 
+    // Create captures array formed by the capture object of the root group
+    // and all its subcaptures.
     var rootGroup = groups[ast.groupId];
     var captures = [ rootGroup.capture ].concat(rootGroup.subcaptures);
+
     return new RegExpAutomata(headNode, captures);
 }
 
+/**
+    Compile a RegExpDisjunction ast node to a sub automata.
+
+                 +---------------+  
+                 |  Alternative  |  3.
+                 +---------------+ \
+      1.     _                      -->  _   5.
+    ------> |_|        ...              |_| ------>
+             2.                     -->  4.
+                 +---------------+ /
+                 |  Alternative  |  3.
+                 +---------------+
+
+
+    1. RegExpGroupOpenTransition
+    2. RegExpGroupNode
+    3. RegExpGroupCloseTransition
+    4. RegExpNode
+    5. nextTransition
+*/
 function disjunctionToAutomata (
     astNode,
     nextTransition,
     context
 )
 {
+    // Get group object from context.
     var group = context.groups[astNode.groupId];
+
     var openNode = new RegExpGroupNode(group);
     var closeNode = new RegExpNode();
 
     var openTransition = new RegExpGroupOpenTransition(openNode, group);
     var closeTransition = new RegExpGroupCloseTransition(closeNode, group);
 
+    // Add the result of the compilation of each alternatives to the group node.
     if (astNode.alternatives.length > 0)
         for (var i = 0; i < astNode.alternatives.length; ++i)
             openNode.addAlternative(alternativeToAutomata(astNode.alternatives[i], closeTransition, context));
     else
+        // Add directly closeTransition if no alternative to compile.
         openNode.addAlternative(closeTransition);
 
     // Set close node final if no next transition.
@@ -173,17 +205,49 @@ function disjunctionToAutomata (
     return openTransition;
 }
 
+/**
+    Compile a RegExpAlternative ast node to a sub automata.
+
+    +------+     +------+   1.
+    | Term | ... | Term |  ----->
+    +------+     +------+
+
+    1. nextTransition
+*/
 function alternativeToAutomata (
     astNode,
     nextTransition,
     context
 )
 {
+    // Concatenate the result of the compilation of each terms.
     for (var i = astNode.terms.length; i > 0; --i)
         nextTransition = termToAutomata(astNode.terms[i - 1], nextTransition, context);
     return nextTransition;
 }
 
+/**
+    Compile a RegExpTerm ast node to a sub automata.
+
+    If value is RegExpAtom.
+
+                                        3.
+                                    ----------- 
+                                  /             \
+                                 |               |
+    +------+     +------+   1.   _   +------+   /
+    | Atom | ... | Atom | ----> |_|  | Atom | --
+    +------+     +------+        2.  +------+
+          min times              |
+                                  \     4.
+                                   ------------>
+
+    1. RegExp(CharMatch|Group|BackRef)LoopOpenTransition
+    2. RegExp(CharMatch|Group|BackRef)LoopNode
+    3. RegExp(CharMatch|Group|BackRef)LoopTransition
+    4. nextTransition
+
+*/
 function termToAutomata (
     astNode,
     nextTransition,
@@ -262,6 +326,9 @@ function termToAutomata (
     return nextTransition;
 }
 
+/**
+    Compile a RegExpTerm ast node to a sub automata.
+*/
 function atomToAutomata (
     astNode,
     nextTransition,
@@ -273,6 +340,17 @@ function atomToAutomata (
 
     node.transition = nextTransition;
 
+    /**
+        RegExpPatternCharacter  
+
+          1.    _   3.
+        -----> |_| ---->
+                2.
+        
+        1. RegExpCharMatchTransition
+        2. RegExpNode
+        3. nextTransition
+    */
     if (atomAstNode instanceof RegExpPatternCharacter)
     {
         var charCode = atomAstNode.value;
@@ -287,6 +365,17 @@ function atomToAutomata (
         else
             nextTransition = new RegExpCharMatchTransition(node, charCode);
     }
+    /**
+        RegExpCharacterClass
+
+          1.    _   3.
+        -----> |_| ---->
+                2.
+        
+        1. (RegExpCharSetMatchTransition|RegExpExCharSetMatchTransition)
+        2. RegExpNode
+        3. nextTransition
+    */
     else if (atomAstNode instanceof RegExpCharacterClass)
     {
         var ranges = [];
@@ -331,6 +420,17 @@ function atomToAutomata (
         else
             nextTransition = new RegExpCharExSetMatchTransition(node, ranges);
     }
+    /**
+        RegExpBackReference
+
+          1.    _   3.
+        -----> |_| ---->
+                2.
+        
+        1. RegExpBackRefMatchTransition
+        2. RegExpNode
+        3. nextTransition
+    */
     else if (atomAstNode instanceof RegExpBackReference)
     {
         var rootGroup = context.groups[0];

@@ -155,34 +155,9 @@ function array_concat()
     return a;
 }
 
-// function array_join(separator)
-// {
-//     var o = array_toObject(this);
-
-//     if (separator === undefined)
-//         separator = ",";
-//     else
-//         separator = separator.toString();
-
-//     var str = "";
-//     for (var i=o.length-1; i>=0; i--)
-//     {
-//         var e = o[i];
-
-//         var estr = (i !== 0) ? separator : "";
-
-//         if (e !== UNDEFINED)
-//         {
-//             estr = estr + String(e);
-//         }
-
-//         str = estr + str;
-//     }
-
-//     return str;
-// }
-
-function array_join(separator)
+function array_join (
+    separator
+)
 {
     var o = array_toObject(this);
 
@@ -190,30 +165,34 @@ function array_join(separator)
         separator = ",";
     else
         separator = separator.toString();
-    
-    var len = 0;
+
+
+    var length = 0;
     var strarray = new Array(o.length);
-    
+
     for (var i = 0; i < o.length; ++i)
     {
         var str = o[i].toString();
-        len += str.length;
+        length += str.length;
         strarray[i] = str;
     }
-    len += (o.length - 1) * separator.length;
+    length += (o.length - 1) * separator.length;
 
-    if (len > 0)
+    if (length > 0)
     {
-        joinCharArray = new Array(len);
-        for (var i = 0, k = 0; i < strarray.length; ++i)
+        var s = alloc_str(unboxInt(length));
+
+        for (var i = 0, k = pint(0); i < strarray.length; ++i)
         {
             for (var j = 0; j < strarray[i].length; ++j, ++k)
-                joinCharArray[k] = strarray[i].charCodeAt(j);
+                set_str_data(s, k, iir.icast(IRType.u16, unboxInt( strarray[i].charCodeAt(j) )));
             if (i < strarray.length - 1)
                 for (var j = 0; j < separator.length; ++j, ++k)
-                    joinCharArray[k] = separator.charCodeAt(j);
+                    set_str_data(s, k, iir.icast(IRType.u16, unboxInt( separator.charCodeAt(j) )));
         }
-        return String.fromCharCode.apply(null, joinCharArray);
+
+        compStrHash(s);
+        return getTableStr(s);
     }
     return "";
 }

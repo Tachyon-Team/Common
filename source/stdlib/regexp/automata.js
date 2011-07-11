@@ -40,10 +40,9 @@
  * _________________________________________________________________________
  */
 
-/***********************************************************************
+/**
     Execution context.
-***********************************************************************/
-
+*/
 function RegExpContext (
     input,
     captures
@@ -56,14 +55,17 @@ function RegExpContext (
     this.backtrackStack = [];
 }
 
+/**
+    Advance one character in the input.
+*/
 RegExpContext.prototype.consume = function ()
 {
-    if (REGEXPDEBUG)
-        print("*** consuming " + this.input[this.index]);
-
     this.setIndex(++this.index);
 }
 
+/**
+    Set context to given index.
+*/
 RegExpContext.prototype.setIndex = function (
     index
 )
@@ -72,32 +74,34 @@ RegExpContext.prototype.setIndex = function (
     this.currentCharCode = this.input.charCodeAt(this.index);
 }
 
+/**
+    Returns true if context is at the end of input, false otherwise.
+*/
 RegExpContext.prototype.endOfInput = function ()
 {
     return this.index >= this.input.length;
 }
 
+/**
+    Returns the node on top of teh backtrack stack.
+*/
 RegExpContext.prototype.getBTNode = function ()
 {
     return this.backtrackStack[this.backtrackStack.length - 1];
 }
 
-RegExpContext.prototype.debugPrintCaptures = function ()
-{
-    for (var i = 0; i < this.captures.length; ++i)
-        print("C" + i + " [" + this.captures[i].start + "," + this.captures[i].end + "]");
-}
-
-/***********************************************************************
-    Group & capture stuctures.
-***********************************************************************/
-
+/**
+    Capture stucture.
+*/
 function RegExpCapture ()
 {
     this.start = -1;
     this.end = -1;
 }
 
+/**
+    Group stucture.
+*/
 function RegExpGroup (
     capture
 )    
@@ -107,7 +111,7 @@ function RegExpGroup (
 }
 
 /**
-    Save captures state into an integer array.
+    Save inner captures state of the group into an array of integers.
 */
 RegExpGroup.prototype.dumpState = function ()
 {
@@ -118,6 +122,7 @@ RegExpGroup.prototype.dumpState = function ()
         state = new Array(this.subcaptures.length * 2 + 2);
         state[0] = this.capture.start;
         state[1] = this.capture.end;
+        // Add every subcaptures.
         for (var i = 0, j = 2; i < this.subcaptures.length; ++i, j += 2)
         {
             state[j] = this.subcaptures[i].start;
@@ -127,6 +132,7 @@ RegExpGroup.prototype.dumpState = function ()
     else
     {
         state = new Array(this.subcaptures.length * 2);
+        // Add every subcaptures.
         for (var i = 0, j = 0; i < this.subcaptures.length; ++i, j += 2)
         {
             state[j] = this.subcaptures[i].start;
@@ -163,6 +169,9 @@ RegExpGroup.prototype.restoreState = function (
     }
 }
 
+/**
+    Set every inner capture and subcaptures to empty (-1, -1).
+*/
 RegExpGroup.prototype.clear = function ()
 {
     if (this.capture)
@@ -175,10 +184,13 @@ RegExpGroup.prototype.clear = function ()
         this.subcaptures[i].start = this.subcaptures[i].end = -1; 
 }
 
-/***********************************************************************
+/**
     Basic automata actions.
-***********************************************************************/
+*/
 
+/**
+    Basic node : one out transition, not final by default.
+*/
 function RegExpNode (
     transition
 )
@@ -187,6 +199,9 @@ function RegExpNode (
     this._final = false;
 }
 
+/**
+    Basic node step : simply execute out transition.
+*/
 RegExpNode.prototype.step = function (
     context
 )
@@ -194,6 +209,9 @@ RegExpNode.prototype.step = function (
     return this.transition.exec(context);
 }
 
+/**
+    Basic transition : one destination node.
+*/
 function RegExpTransition (
     destNode
 )
@@ -201,6 +219,9 @@ function RegExpTransition (
     this.destNode = destNode;
 }
 
+/**
+    Basic transition exec : simply returns destination node.
+*/
 RegExpTransition.prototype.exec = function (
     context
 )
@@ -208,9 +229,9 @@ RegExpTransition.prototype.exec = function (
     return this.destNode;
 }
 
-/***********************************************************************
+/**
     Group automata actions.
-***********************************************************************/
+*/
 
 function RegExpGroupNode (
     group
@@ -267,14 +288,9 @@ RegExpGroupNode.prototype.backtrack = function (
 
     // Restore index
     if (!this.group.capture || this.group.capture !== context.captures[0])
-    {
         context.setIndex(state[0]);
-//        this.group.restoreState(state[1]);
-    }
     else
-    {
         context.setIndex(0);
-    }
 
     // Set next path.
     if (++(this.nextPath) >= this.transitions.length)
@@ -812,10 +828,6 @@ RegExpGroupNonGreedyLoopNode.prototype.backtrack = function (
 )
 {
     context.backtrackStack.pop();
-
-    if (this.nextTransition === this.loopTransition)
-    {
-    }
 
     if (this.times > 0)
     {

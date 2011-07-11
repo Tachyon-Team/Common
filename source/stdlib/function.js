@@ -158,3 +158,5 @@ Function.prototype.call = function (thisArg)
     return retVal;
 };
 
+Function.prototype.length = 0;
+
