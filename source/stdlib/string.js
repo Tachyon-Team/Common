@@ -209,7 +209,7 @@ function string_charAt(pos)
     return string_internal_fromCharCodeArray([ch]);
 }
 
-function string_concat ()
+function string_concat()
 {
     var l = this.length;
 

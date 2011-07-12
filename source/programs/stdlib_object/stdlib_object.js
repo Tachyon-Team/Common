@@ -53,6 +53,15 @@ function test_ctor()
     if (!(o instanceof Object))
         return 3;
 
+    if (typeof new Object() !== 'object')
+        return 4;
+
+    if (typeof Object() !== 'object')
+        return 5;
+
+    if (!(Object('foobar') instanceof String))
+        return 6;
+
     return 0;
 }
 
@@ -64,6 +73,43 @@ function test_getPrototypeOf()
 
     if (Object.getPrototypeOf(o) !== Object.prototype)
         return 1;
+
+    return 0;
+}
+
+function test_getOwnPropertyDescriptor()
+{
+    // Test that the method exists
+    if (!Object.getOwnPropertyDescriptor)
+        return 1;
+
+    var o = {p1:1};
+
+    var desc = Object.getOwnPropertyDescriptor(o, 'p1');
+
+    if (desc.value !== 1)
+        return 2;
+
+    return 0;
+}
+
+function test_getOwnPropertyNames()
+{
+    var a = {k1:1};
+    var b = Object.create(a);
+    b.k2 = 2;
+    b.k3 = 3;
+
+    var keys = Object.keys(b);
+
+    if (keys.length !== 2)
+        return 1;
+
+    if (keys.indexOf('k2') === -1)
+        return 2;
+
+    if (keys.indexOf('k3') === -1)
+        return 3;
 
     return 0;
 }
@@ -96,13 +142,123 @@ function test_defineProperty()
     return 0;
 }
 
+function test_defineProperties()
+{
+    // Test that the method exists
+    if (!Object.defineProperties)
+        return 1;
+
+    var o = {};
+
+    Object.defineProperties(
+        o, 
+        {
+            p1: { value: 1},
+            p2: { value: 2}
+        }
+    );
+
+    if (o.p1 !== 1)
+        return 2;
+
+    if (o.p2 !== 2)
+        return 3;
+
+    return 0;
+}
+
+function test_seal()
+{
+    // Test that the method exists
+    if (!Object.seal)
+        return 1;
+
+    return 0;
+}
+
+function test_freeze()
+{
+    // Test that the method exists
+    if (!Object.freeze)
+        return 1;
+
+    return 0;
+}
+
+function test_preventExtensions()
+{
+    // Test that the method exists
+    if (!Object.preventExtensions)
+        return 1;
+
+    return 0;
+}
+
+function test_isSealed()
+{
+    // Test that the method exists
+    if (!Object.isSealed)
+        return 1;
+
+    return 0;
+}
+
+function test_isFrozen()
+{
+    // Test that the method exists
+    if (!Object.isFrozen)
+        return 1;
+
+    return 0;
+}
+
+function test_isExtensible()
+{
+    // Test that the method exists
+    if (!Object.isExtensible)
+        return 1;
+
+    return 0;
+}
+
+function test_keys()
+{
+    var a = {k1:1};
+    var b = Object.create(a);
+    b.k2 = 2;
+    b.k3 = 3;
+
+    var keys = Object.keys(b);
+
+    if (keys.length !== 2)
+        return 1;
+
+    if (keys.indexOf('k2') === -1)
+        return 2;
+
+    if (keys.indexOf('k3') === -1)
+        return 3;
+
+    return 0;
+}
+
 function test_toString()
 {
     //Object.prototype.toString = function ()
 
     var o = {};
 
-    if (o.toString() !== 'object')
+    if (typeof o.toString() !== 'string')
+        return 1;
+
+    return 0;
+}
+
+function test_toLocaleString()
+{
+    var o = {};
+
+    if (typeof o.toLocaleString() !== 'string')
         return 1;
 
     return 0;
@@ -159,6 +315,17 @@ function test_isPrototypeOf()
     return 0;
 }
 
+function test_propertyIsEnumerable()
+{
+    var o = {};
+
+    // Test that the method exists
+    if (!o.propertyIsEnumerable)
+        return 1;
+
+    return 0;
+}
+
 function test()
 {
     var r = test_ctor();
@@ -169,29 +336,77 @@ function test()
     if (r != 0)
         return 200 + r;
 
-    var r = test_create();
+    var r = test_getOwnPropertyDescriptor();
     if (r != 0)
         return 300 + r;
 
-    var r = test_defineProperty();
+    var r = test_getOwnPropertyNames();
     if (r != 0)
         return 400 + r;
 
-    var r = test_toString();
+    var r = test_create();
     if (r != 0)
         return 500 + r;
 
-    var r = test_valueOf();
+    var r = test_defineProperty();
     if (r != 0)
         return 600 + r;
 
-    var r = test_hasOwnProperty();
+    var r = test_defineProperties();
     if (r != 0)
         return 700 + r;
 
-    var r = test_isPrototypeOf();
+    var r = test_seal();
     if (r != 0)
         return 800 + r;
+
+    var r = test_freeze();
+    if (r != 0)
+        return 900 + r;
+
+    var r = test_preventExtensions();
+    if (r != 0)
+        return 1000 + r;
+
+    var r = test_isSealed();
+    if (r != 0)
+        return 1100 + r;
+
+    var r = test_isFrozen();
+    if (r != 0)
+        return 1200 + r;
+
+    var r = test_isExtensible();
+    if (r != 0)
+        return 1300 + r;
+
+    var r = test_keys();
+    if (r != 0)
+        return 1400 + r;
+
+    var r = test_toString();
+    if (r != 0)
+        return 1500 + r;
+
+    var r = test_toLocaleString();
+    if (r != 0)
+        return 1600 + r;
+
+    var r = test_valueOf();
+    if (r != 0)
+        return 1700 + r;
+
+    var r = test_hasOwnProperty();
+    if (r != 0)
+        return 1800 + r;
+
+    var r = test_isPrototypeOf();
+    if (r != 0)
+        return 1900 + r;
+
+    var r = test_propertyIsEnumerable();
+    if (r != 0)
+        return 2000 + r;
 
     return 0;
 }

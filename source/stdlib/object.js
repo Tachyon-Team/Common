@@ -55,8 +55,31 @@ Object([value])
 */
 function Object(value)
 {
-    // TODO
+    if (value !== undefined && value !== null)
+    {
+        switch (typeof value)
+        {
+            case 'object':
+            case 'function':
+            return value;
+
+            case 'boolean':
+            return new Boolean(value);
+
+            case 'string':
+            return new String(value);
+
+            case 'number':
+            return new Number(value);
+        }
+
+        error('invalid value passed to Object constructor');
+    }
+
+    return {};
 }
+
+Object.length = 1;
 
 /**
 15.2.3.1 Object prototype object
@@ -107,12 +130,44 @@ Object.getPrototypeOf = function (obj)
 };
 
 /**
-15.2.3.5 Object.create ( O [, Properties] )
-FIXME: for now, we ignore the properties
+15.2.3.3 Get a descriptor for an object's property
+FIXME: for now, no property attributes
 */
-Object.create = function (obj, props)
+Object.getOwnPropertyDescriptor = function (O, P)
 {
-    if (boxIsObjExt(obj) === false && obj !== null)
+    if (boxIsObjExt(O) === false)
+        throw TypeError('invalid object');
+
+    name = boxToString(P);
+
+    return { writable:true, enumerable:true, configurable: true, value: O[name] };
+}
+
+/**
+15.2.3.4 Get the named own properties of an object (excludes the prototype chain)
+*/
+Object.getOwnPropertyNames = function (O)
+{
+    if (boxIsObjExt(O) === false)
+        throw TypeError('invalid object');
+
+    var propNames = [];
+
+    for (k in O)
+    {
+        if (O.hasOwnProperty(k) === true)
+            propNames.push(k);
+    }
+
+    return propNames;
+}
+
+/**
+15.2.3.5 Object.create ( O [, Properties] )
+*/
+Object.create = function (O, Properties)
+{
+    if (boxIsObjExt(O) === false && obj !== null)
     {
         throw makeError(
             TypeError, 
@@ -120,7 +175,10 @@ Object.create = function (obj, props)
         );
     }
 
-    var newObj = newObject(obj);
+    var newObj = newObject(O);
+
+    if (Properties !== undefined)
+        Object.defineProperties(newObj, Properties);
 
     return newObj;
 };
@@ -141,11 +199,76 @@ Object.defineProperty = function (obj, prop, attribs)
 };
 
 /**
+15.2.3.7 Object.defineProperties ( O, Properties )
+*/
+Object.defineProperties = function (O, Properties)
+{
+    if (boxIsObjExt(O) === false)
+        throw TypeError('invalid object');
+
+    for (name in Properties)
+    {
+        Object.defineProperty(O, name, Properties[name]);
+    }
+}
+
+/**
+15.2.3.8 Object.seal ( O )
+FIXME: noop function for now
+*/
+Object.seal = function (O)
+{
+    if (boxIsObjExt(O) === false)
+        throw TypeError('invalid object');
+
+    return O;
+}
+
+/**
+15.2.3.9 Object.freeze ( O )
+FIXME: noop function for now
+*/
+Object.freeze = function (O)
+{
+    if (boxIsObjExt(O) === false)
+        throw TypeError('invalid object');
+
+    return O;
+}
+
+/**
+15.2.3.10 Object.preventExtensions ( O )
+FIXME: noop function for now
+*/
+Object.preventExtensions = function (O)
+{
+    if (boxIsObjExt(O) === false)
+        throw TypeError('invalid object');
+
+    return O;
+}
+
+/**
+15.2.3.11 Object.isSealed ( O )
+FIXME: noop function for now
+*/
+Object.isSealed = function (O)
+{
+    if (boxIsObjExt(O) === false)
+        throw TypeError('invalid object');
+
+    return false; 
+}
+
+/**
 15.2.3.12 Object.isFrozen ( O )
 FIXME: for now, all objects are extensible
 */
-Object.isFrozen = function (obj)
+Object.isFrozen = function (O)
 {
+    if (boxIsObjExt(O) === false)
+        throw TypeError('invalid object');
+
     return false;
 };
 
@@ -153,10 +276,32 @@ Object.isFrozen = function (obj)
 15.2.3.13 Object.isExtensible ( O )
 FIXME: for now, all objects are extensible
 */
-Object.isExtensible = function (obj)
+Object.isExtensible = function (O)
 {
+    if (boxIsObjExt(O) === false)
+        throw TypeError('invalid object');
+
     return true;
 };
+
+/**
+15.2.3.14 Object.keys ( O )
+*/
+Object.keys = function (O)
+{
+    if (boxIsObjExt(O) === false)
+        throw TypeError('invalid object');
+
+    var propNames = [];
+
+    for (k in O)
+    {
+        if (O.hasOwnProperty(k) === true)
+            propNames.push(k);
+    }
+
+    return propNames;
+}
 
 /**
 15.2.4.2 Default object to string conversion function
@@ -164,6 +309,14 @@ Object.isExtensible = function (obj)
 Object.prototype.toString = function ()
 {
     return "object";
+};
+
+/**
+15.2.4.3 Object to string conversion function with locale handling
+*/
+Object.prototype.toLocaleString = function ()
+{
+    return this.toString();
 };
 
 /**
@@ -185,10 +338,22 @@ Object.prototype.hasOwnProperty = function (prop)
 /**
 15.2.4.6 Test that an object is the prototype of another
 */
-Object.prototype.isPrototypeOf = function (obj)
+Object.prototype.isPrototypeOf = function (O)
 {
-    var proto = Object.getPrototypeOf(obj);
+    var proto = Object.getPrototypeOf(O);
 
     return (this === proto);
 };
+
+/**
+15.2.4.7 Object.prototype.propertyIsEnumerable (V)
+FIXME: for now, all properties are enumerable
+*/
+Object.prototype.propertyIsEnumerable = function (V)
+{
+    if (this.hasOwnProperty(V) === false)
+        return false;
+
+    return true;
+}
 
