@@ -97,9 +97,24 @@ Anonymous function to initialize this library
 
 //-----------------------------------------------------------------------------
 
-// Operations on String objects.
+/**
+Internal string functions.
+*/
 
-function string_internal_charCodeAt(s, pos)
+function string_internal_toString (
+    s
+)
+{
+    if (s instanceof String)
+        return s.value;
+
+    return s;
+}
+
+function string_internal_charCodeAt (
+    s,
+    pos
+)
 {
     var idx = unboxInt(pos);
 
@@ -108,7 +123,9 @@ function string_internal_charCodeAt(s, pos)
     return boxInt(iir.icast(IRType.pint, ch));
 }
 
-function string_internal_getLength(s)
+function string_internal_getLength (
+    s
+)
 {
     "tachyon:noglobal";
 
@@ -117,7 +134,9 @@ function string_internal_getLength(s)
     return boxInt(strLen);
 }
 
-function string_internal_toCharCodeArray(x)
+function string_internal_toCharCodeArray (
+    x
+)
 {
     var s = x.toString();
     var a = new Array(s.length);
@@ -131,7 +150,9 @@ function string_internal_toCharCodeArray(x)
     return a;
 }
 
-function string_internal_fromCharCodeArray(a)
+function string_internal_fromCharCodeArray (
+    a
+)
 {
     "tachyon:noglobal";
 
@@ -161,44 +182,49 @@ function string_internal_fromCharCodeArray(a)
     return getTableStr(strObj);
 }
 
-function string_internal_toString(s)
+function string_internal_isWhiteSpace (
+    c
+)
 {
-    if (s instanceof String)
-        return s.value;
-
-    return s;
+    return (c >= 9 && c <= 13) || (c === 32) ||
+           (c === 160) || (c >= 8192 && c <= 8202) || (c === 8232) ||
+           (c === 8233) || (c === 8239) || (c === 8287) ||
+           (c === 12288) || (c === 65279);
 }
 
-function string_toString()
-{
-    return string_internal_toString(this);
-}
+//-----------------------------------------------------------------------------
 
-function string_valueOf()
-{
-    return string_internal_toString(this);
-}
-
+/**
+15.5.3.2 String.fromCharCode([char0 [, char1 [, ... ]]])
+*/
 function string_fromCharCode()
 {
     var args = Array.prototype.slice.call(arguments, 0);
     return string_internal_fromCharCodeArray(args);
 }
 
-function string_charCodeAt(pos)
+/**
+15.5.4.2 String.prototype.toString()
+*/
+function string_toString ()
 {
-    var len = string_internal_getLength(this.toString());
-
-    if (pos >= 0 && pos < len)
-    {
-        return string_internal_charCodeAt(this.toString(), pos);
-    }
-
-    // FIXME: return NaN when doubles are implemented
-    return -1;
+    return string_internal_toString(this);
 }
 
-function string_charAt(pos)
+/**
+15.5.4.3 String.prototype.valueOf()
+*/
+function string_valueOf ()
+{
+    return string_internal_toString(this);
+}
+
+/**
+15.5.4.4 String.prototype.charAt(pos)
+*/
+function string_charAt (
+    pos
+)
 {
     if (pos < 0 || pos >= string_internal_getLength(this))
     {
@@ -209,6 +235,27 @@ function string_charAt(pos)
     return string_internal_fromCharCodeArray([ch]);
 }
 
+/**
+15.5.4.5 String.prototype.charCodeAt(pos)
+*/
+function string_charCodeAt (
+    pos
+)
+{
+    var len = string_internal_getLength(this.toString());
+
+    if (pos >= 0 && pos < len)
+    {
+        return string_internal_charCodeAt(this.toString(), pos);
+    }
+
+    // FIXME: return NaN when doubles are implemented
+    return null;
+}
+
+/**
+15.5.4.6 String.prototype.concat([string1 [, string2 [, ... ]]])
+*/
 function string_concat()
 {
     var l = this.length;
@@ -230,6 +277,9 @@ function string_concat()
     return getTableStr(s);
 }
 
+/**
+15.5.4.7 String.prototype.indexOf(searchString, position)
+*/
 function string_indexOf (
     searchString,
     pos
@@ -255,6 +305,9 @@ function string_indexOf (
     return -1;
 }
 
+/**
+15.5.4.8 String.prototype.lastIndexOf(searchString, position)
+*/
 function string_lastIndexOf (
     searchString,
     pos
@@ -303,6 +356,9 @@ function string_lastIndexOf (
     return -1;
 }
 
+/**
+15.5.4.9 String.prototype.localeCompare(that)
+*/
 function string_localeCompare (
     that
 )
@@ -339,7 +395,12 @@ function string_localeCompare (
     }
 }
 
-function string_match(regexp)
+/**
+15.5.4.10 String.prototype.match(regexp)
+*/
+function string_match (
+    regexp
+)
 {
     var re;
 
@@ -367,35 +428,13 @@ function string_match(regexp)
     }
 }
 
-function string_search(regexp)
-{
-    var re;
-    var globalSave;
-    var lastIndexSave;
-
-    if (regexp instanceof RegExp)
-        re = regexp;
-    else
-        re = new RegExp(regexp);
-
-    globalSave = re.global;
-    lastIndexSave = re.lastIndex;
-    re.global = true;
-    re.lastIndex = 0;
-
-    var matchIndex = -1;
-    var match = re.exec(this);
-    if (match !== null)
-    {
-        matchIndex = re.lastIndex - match[0].length;
-    }
-
-    re.global = globalSave;
-    re.lastIndex = lastIndexSave;
-    return matchIndex;
-}
-
-function string_replace(searchValue, replaceValue)
+/**
+15.5.4.11 String.prototype.replace(searchValue, replaceValue)
+*/
+function string_replace (
+    searchValue,
+    replaceValue
+)
 {
     // FIXME: support function as replaceValue
     if (typeof searchValue === "string")
@@ -533,7 +572,56 @@ function string_replace(searchValue, replaceValue)
     return this.toString();
 }
 
-function string_split(separator, limit)
+/**
+15.5.4.12 String.prototype.search(regexp)
+*/
+function string_search (
+    regexp
+)
+{
+    var re;
+    var globalSave;
+    var lastIndexSave;
+
+    if (regexp instanceof RegExp)
+        re = regexp;
+    else
+        re = new RegExp(regexp);
+
+    globalSave = re.global;
+    lastIndexSave = re.lastIndex;
+    re.global = true;
+    re.lastIndex = 0;
+
+    var matchIndex = -1;
+    var match = re.exec(this);
+    if (match !== null)
+    {
+        matchIndex = re.lastIndex - match[0].length;
+    }
+
+    re.global = globalSave;
+    re.lastIndex = lastIndexSave;
+    return matchIndex;
+}
+
+/**
+15.5.4.13 String.prototype.slice(start, end)
+*/
+function string_slice (
+    start,
+    end
+)
+{
+}
+
+/**
+15.5.4.14 String.prototype.split(separator, limit)
+*/
+function string_split(
+    separator,
+    limit
+)
 {
     var res = new Array();
     if (limit === 0) return res;
@@ -564,6 +652,9 @@ function string_split(separator, limit)
     return res;
 }
 
+/**
+15.5.4.15 String.prototype.substring(start, end)
+*/
 function string_substring (
     start,
     end
@@ -602,6 +693,9 @@ function string_substring (
     return getTableStr(s);
 }
 
+/**
+String.prototype.substr(start, length)
+*/
 function string_substr (
     start,
     length
@@ -612,7 +706,10 @@ function string_substr (
     return string_substring.apply(this, [start, end]);
 }
 
-function string_toLowerCase()
+/**
+15.5.4.16 String.prototype.toLowerCase()
+*/
+function string_toLowerCase ()
 {
     var a = string_internal_toCharCodeArray(this);
 
@@ -637,13 +734,19 @@ function string_toLowerCase()
     return string_internal_fromCharCodeArray(a);
 }
 
-function string_toLocaleLowerCase()
+/**
+15.5.4.17 String.prototype.toLocaleLowerCase()
+*/
+function string_toLocaleLowerCase ()
 {
     // FIXME: not quire correct for the full Unicode
     return this.toLowerCase();
 }
 
-function string_toUpperCase()
+/**
+15.5.4.18 String.prototype.toUpperCase()
+*/
+function string_toUpperCase ()
 {
     var a = string_internal_toCharCodeArray(this);
 
@@ -664,25 +767,21 @@ function string_toUpperCase()
     return string_internal_fromCharCodeArray(a);
 }
 
-function string_toLocaleUpperCase()
+/**
+15.5.4.19 String.prototype.toLocaleUpperCase()
+*/
+function string_toLocaleUpperCase ()
 {
     // FIXME: not quire correct for the full Unicode
     return this.toUpperCase();
 }
 
-function string_internal_isWhiteSpace (
-    c
-)
-{
-    return (c >= 9 && c <= 13) || (c === 32) ||
-           (c === 160) || (c >= 8192 && c <= 8202) || (c === 8232) ||
-           (c === 8233) || (c === 8239) || (c === 8287) ||
-           (c === 12288) || (c === 65279);
-}
-
+/**
+15.5.4.20 String.prototype.trim()
+*/
 function string_trim ()
 {
-    var from = 0, to = string_internal_getLength(this) - 1;
+    var from = 0, to = this.length - 1;
 
     while (string_internal_isWhiteSpace(this.charCodeAt(from)))
         ++from;
@@ -693,56 +792,43 @@ function string_trim ()
     return this.substring(from, to + 1);
 }
 
-// Setup string methods
+/**
+Setup String method.
+*/
+
 String.fromCharCode = string_fromCharCode;
 
-// Setup String.prototype
+/**
+Setup String prototype.
+*/
+
 String.prototype.toString = string_toString;
-
 String.prototype.charCodeAt = string_charCodeAt;
-
 String.prototype.valueOf = string_valueOf;
-
 String.prototype.charAt = string_charAt;
-
 String.prototype.concat = string_concat;
-String.prototype.concat.length = 1;
-
 String.prototype.indexOf = string_indexOf;
-String.prototype.indexOf.length = 1;
-
 String.prototype.lastIndexOf = string_lastIndexOf;
-String.prototype.lastIndexOf.length = 1;
-
 String.prototype.localeCompare = string_localeCompare;
-
 String.prototype.slice = string_substring;
-String.prototype.slice.length = 2;
-
 String.prototype.match = string_match;
-
 String.prototype.replace = string_replace;
-
 String.prototype.search = string_search;
-
 String.prototype.split = string_split;
-
-String.prototype.split.length = 2;
-
 String.prototype.substring = string_substring;
-String.prototype.substring.length = 2;
-
 String.prototype.substr = string_substr;
-
 String.prototype.toLowerCase = string_toLowerCase;
-
 String.prototype.toLocaleLowerCase = string_toLocaleLowerCase;
-
 String.prototype.toUpperCase = string_toUpperCase;
-
 String.prototype.toLocaleUpperCase = string_toLocaleUpperCase;
-
 String.prototype.trim = string_trim;
+
+String.prototype.concat.length = 1;
+String.prototype.indexOf.length = 1;
+String.prototype.lastIndexOf.length = 1;
+String.prototype.slice.length = 2;
+String.prototype.split.length = 2;
+String.prototype.substring.length = 2;
 
 //-----------------------------------------------------------------------------
 
