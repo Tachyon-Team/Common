@@ -48,6 +48,8 @@ function parseInt (
     var i = 0;
     var positive = true;
 
+    string = new String(string).toString();
+
     // Skip whitespace
     while (string_internal_isWhiteSpace(string.charCodeAt(i)))
         ++i;
@@ -107,53 +109,17 @@ function parseInt (
     return null; 
 }
 
-function parseFloat (
-    string
+function _encodeURI (
+    decodedURI,
+    isUnescapedClassFilter
 )
 {
-}
-
-function isNaN (
-    number
-)
-{
-}
-
-function isFinite (
-    number
-)
-{
-}
-
-function decodeURI (
-    encodedURI
-)
-{
-}
-
-function decodeURIComponent (
-    encodedURIComponent
-)
-{
-}
-
-function encodeURI (
-    decodedURI
-)
-{
-    function isUnescapedClass (c)
-    {
-        return ((c >= 65 && c <= 90) || (c >= 97 && c <= 122) ||
-                (c >= 48 && c <= 57) || (c >= 39 && c <= 42)  ||
-                c === 45 || c === 95 || c === 46 || c === 33  || c === 126);
-    }
-
     var encodedURIParts = [], i = 0, j = 0;
 
     for (var i = 0; i < decodedURI.length;)
     {
         while (i < decodedURI.length &&
-               isUnescapedClass(decodedURI.charCodeAt(i)))
+               _isUnescapedClass(decodedURI.charCodeAt(i)))
            ++i;
 
         if (i < decodedURI.length)
@@ -226,9 +192,121 @@ function encodeURI (
     return encodedURIParts.join("");
 }
 
+function extractHexValue (
+    str,
+    pos
+)
+{
+    var value = 0, i = pos;
+
+    for (; i < 2; ++i)
+    {
+        var hc = str.charCodeAt(i);
+
+        if (hc >= 97 && hc <= 102) // a-f
+            value = (value * 16) + (hc - 87);
+        else if (hc >= 65 && hc <= 70) // A-F
+            value = (value * 16) + (hc - 55);
+        else if (hc >= 48 && hc <= 57) // 0-9
+            value = (value * 16) + (hc - 48);
+        else
+            return null;
+    }
+    return value;
+}
+
+function _decodeURI (
+    encodedURI
+)
+{
+    var decodedURIParts = [], i = 0, j = 0;
+
+    for (var i = 0; i < encodedURI.length;)
+    {
+        while (i < decodedURI.length &&
+               decodedURI.charCodeAt(i) !== 37) // '%'
+           ++i;
+
+        if (i < encodedURI.length)
+        {
+            if (i + 2 >= encodedURI.length)
+                // FIXME: must throw URIError.
+                return null;
+
+            if (j < i)
+                decodedURIParts.push(encodedURI.substring(j, i));
+
+            var charCode;
+            while (true)
+            {
+                var value = extractHexValue(encodedURI, i + 1);
+                print(value);
+
+                if (value === null)
+                    // FIXME: must throw URIError.
+                    return null;
+            }
+        }
+    }
+}
+
+function _isUnescapedClassWithDash (c)
+{
+    return ((c >= 65 && c <= 90) || (c >= 97 && c <= 122) ||
+            (c >= 48 && c <= 57) || (c >= 39 && c <= 42)  ||
+            c === 45 || c === 95 || c === 46 || c === 33  ||
+            c === 126 || c === 35);
+}
+
+function _isUnescapedClass(c)
+{
+    return ((c >= 65 && c <= 90) || (c >= 97 && c <= 122) ||
+            (c >= 48 && c <= 57) || (c >= 39 && c <= 42)  ||
+            c === 45 || c === 95 || c === 46 || c === 33  ||
+            c === 126);
+}
+
+function parseFloat (
+    string
+)
+{
+}
+
+function isNaN (
+    number
+)
+{
+}
+
+function isFinite (
+    number
+)
+{
+}
+
+function decodeURI (
+    encodedURI
+)
+{
+}
+
+function decodeURIComponent (
+    encodedURIComponent
+)
+{
+}
+
+function encodeURI (
+    decodedURI
+)
+{
+    return _encodeURI(decodedURI, _isUnescapedClassWithDash);
+}
+
 function encodeURIComponent (
     decodedURIComponent
 )
 {
+    return _encodeURI(decodedURIComponent, _isUnescapedClass);
 }
 
