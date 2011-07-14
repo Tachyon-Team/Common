@@ -51,4 +51,19 @@ Maxime Chevalier-Boisvert
 Copyright (c) 2011 Tachyon Javascript Engine, All Rights Reserved
 */
 
+function JSON () {}
+
+JSON.stringify = function (
+    value
+)
+{
+}
+
+JSON.parse = function (
+    text,
+    reviver
+)
+{
+    return jsonParse(text, reviver);
+}
 
