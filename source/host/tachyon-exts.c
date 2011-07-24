@@ -485,6 +485,33 @@ TachVal callTachyonFFI(
         );
         break;
 
+        case 7:
+        retVal = funcPtr(
+            ctxPtr,
+            tachArgs[0],
+            tachArgs[1],
+            tachArgs[2],
+            tachArgs[3],
+            tachArgs[4],
+            tachArgs[5],
+            tachArgs[6]
+        );
+        break;
+
+        case 8:
+        retVal = funcPtr(
+            ctxPtr,
+            tachArgs[0],
+            tachArgs[1],
+            tachArgs[2],
+            tachArgs[3],
+            tachArgs[4],
+            tachArgs[5],
+            tachArgs[6],
+            tachArgs[7]
+        );
+        break;
+
         default:
         printf("Error in callTachyonFFI -- unsupported argument count: %d\n", (int)numArgs);
         exit(1);
