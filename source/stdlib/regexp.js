@@ -87,6 +87,11 @@ function RegExp (
     set_ctx_regexp(ctx, RegExp);
 })();
 
+RegExp.prototype.toString = function ()
+{
+    return this.source;
+}
+
 RegExp.prototype.exec = function (
     input
 )
