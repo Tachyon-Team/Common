@@ -542,6 +542,34 @@ function array_lastIndexOf(searchElement, fromIndex)
     return -1;
 }
 
+function array_every (
+    callbackfn,
+    thisArg
+)
+{
+    var o = array_toObject(this);
+    var len = o.length;
+
+    for (var i = 0; i < len; i++)
+        if (!callbackfn.call(thisArg, o[i], i, o))
+            return false;
+    return true;
+}
+
+function array_some (
+    callbackfn,
+    thisArg
+)
+{
+    var o = array_toObject(this);
+    var len = o.length;
+
+    for (var i = 0; i < len; i++)
+        if (callbackfn.call(thisArg, o[i], i, o))
+            return true;
+    return false;
+}
+
 function array_forEach(callbackfn, thisArg)
 {
     var o = array_toObject(this);
@@ -581,23 +609,36 @@ function array_filter(callbackfn, thisArg)
     return a;
 }
 
+function array_reduce ()
+{
+}
+
+function array_reduceRight ()
+{
+}
+
 // Setup Array.prototype .
 
-Array.prototype.toString    = array_toString;
-Array.prototype.concat      = array_concat;
-Array.prototype.join        = array_join;
-Array.prototype.pop         = array_pop;
-Array.prototype.push        = array_push;
-Array.prototype.reverse     = array_reverse;
-Array.prototype.shift       = array_shift;
-Array.prototype.slice       = array_slice;
-Array.prototype.sort        = array_sort;
-Array.prototype.splice      = array_splice;
-Array.prototype.unshift     = array_unshift;
-Array.prototype.indexOf     = array_indexOf;
-Array.prototype.lastIndexOf = array_lastIndexOf;
-Array.prototype.forEach     = array_forEach;
-Array.prototype.map         = array_map;
-Array.prototype.filter      = array_filter;
+Array.prototype.toString          = array_toString;
+Array.prototype.toLocaleString    = array_toString;
+Array.prototype.concat            = array_concat;
+Array.prototype.join              = array_join;
+Array.prototype.pop               = array_pop;
+Array.prototype.push              = array_push;
+Array.prototype.reverse           = array_reverse;
+Array.prototype.shift             = array_shift;
+Array.prototype.slice             = array_slice;
+Array.prototype.sort              = array_sort;
+Array.prototype.splice            = array_splice;
+Array.prototype.unshift           = array_unshift;
+Array.prototype.indexOf           = array_indexOf;
+Array.prototype.lastIndexOf       = array_lastIndexOf;
+Array.prototype.every             = array_every;
+Array.prototype.some              = array_some;
+Array.prototype.forEach           = array_forEach;
+Array.prototype.map               = array_map;
+Array.prototype.filter            = array_filter;
+Array.prototype.reduce            = array_reduce;
+Array.prototype.reduceRight       = array_reduceRight;
 
 //-----------------------------------------------------------------------------
