@@ -93,6 +93,7 @@ COMMON_SRCS =                           \
 
 # Standard library source files
 STDLIB_SRCS =                           \
+    stdlib/global.js                    \
     stdlib/object.js                    \
     stdlib/function.js                  \
     stdlib/array.js                     \
