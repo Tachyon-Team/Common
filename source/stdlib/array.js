@@ -172,7 +172,11 @@ function array_join (
 
     for (var i = 0; i < o.length; ++i)
     {
-        var str = o[i].toString();
+        var str;
+        if (o[i] !== undefined)
+            str = o[i].toString();
+        else
+            str = "";
         length += str.length;
         strarray[i] = str;
     }

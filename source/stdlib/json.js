@@ -51,6 +51,11 @@ Maxime Chevalier-Boisvert, Olivier Matz
 Copyright (c) 2011 Tachyon Javascript Engine, All Rights Reserved
 */
 
+// TODO: parse float number
+// TODO: throw SyntaxError where applicable
+// TODO: properties attributes
+// TODO: object and array indent
+
 function JSON () {}
 
 JSON.toString = function ()
@@ -211,7 +216,7 @@ JSON.stringify = function (
     {
         var parts = [];
 
-        if (espace !== undefined)
+        if (espace !== undefined && a.length > 0)
             parts.push("[\n");
         else
             parts.push("[");
@@ -234,7 +239,7 @@ JSON.stringify = function (
         if (a.length > 0)
             parts.pop();
 
-        if (espace !== undefined)
+        if (espace !== undefined && a.length > 0)
             parts.push("\n]");
         else
             parts.push("]");
@@ -611,6 +616,49 @@ JSON.parse = function (
         return n;
     }
 
-    return parseJSON();
+    function walk (
+        holder,
+        name
+    )
+    {
+        var value;
+        if (name === "")
+            value = holder;
+        else
+            value = holder[name]; 
+
+        if ((typeof value) === "object")
+        {
+            if (value instanceof Array)
+            {
+                for (var i = 0; i < value.length; ++i)
+                {
+                    var elt = walk(value, i.toString());
+
+                    if (elt === undefined)
+                        // Delete a value in an array is not currently supported.
+                        // delete value[i.toString()];
+                        value[i.toString()] = undefined;
+                }
+            }
+            else
+            {
+                for (prop in value)
+                {
+                    var elt = walk(value, prop);
+
+                    if (elt === undefined)
+                        delete value[prop];
+                }
+            }
+        }
+
+        return reviver.call(holder, name, value);
+    }
+
+    var r = parseJSON();
+    if (reviver !== undefined)
+        walk(r, "");
+    return r;
 }
 
