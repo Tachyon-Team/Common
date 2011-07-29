@@ -54,7 +54,6 @@ Copyright (c) 2011 Tachyon Javascript Engine, All Rights Reserved
 // TODO: parse float number
 // TODO: throw SyntaxError where applicable
 // TODO: properties attributes
-// TODO: object and array indent
 
 function JSON () {}
 
@@ -113,7 +112,8 @@ JSON.stringify = function (
     }
 
     function toJSON (
-        value
+        value,
+        depth
     )
     {
         if (typeof value.toJSON === "function")
@@ -156,93 +156,128 @@ JSON.stringify = function (
             objStack.push(value);
 
             if (value instanceof Array)
-                return arrayToJSON(value);
+                return arrayToJSON(value, depth);
 
-            return objectToJSON(value);
+            return objectToJSON(value, depth);
         }
         return undefined;
     }
 
     function objectToJSON (
-        o
+        o,
+        depth
     )
     {
+        var keys = Object.keys(o);
+
+        if (keys.length === 0)
+            return "{}";
+
         var parts = [];
 
-        if (espace !== undefined)
-            parts.push("{\n");
-        else
+        if (espace === undefined)
+        {
             parts.push("{");
 
-        for (key in o)
-        {
-            var strp = toJSON(o[key]);
-
-            if (strp !== undefined)
+            for (var i = 0; i < keys.length; ++i)
             {
-                if (espace !== undefined)
-                    parts.push(espace);
 
-                parts.push(quote(key));        
+                var strp = toJSON(o[keys[i]], depth + 1);
 
-                if (espace !== undefined)
-                    parts.push(": ");
-                else
+                if (strp !== undefined)
+                {
+                    parts.push(quote(keys[i]));        
                     parts.push(":");
-
-                parts.push(strp);
-
-                if (espace !== undefined)
-                    parts.push(",\n");
-                else
+                    parts.push(strp);
                     parts.push(",");
+                }
             }
-        }
 
-        if (parts.length > 1)
-            parts.pop();
-
-        if (espace !== undefined)
-            parts.push("\n}");
-        else
+            if (parts.length > 1)
+                parts.pop();
             parts.push("}");
+        }
+        else
+        {
+            parts.push("{\n");
+
+            for (var i = 0; i < keys.length; ++i)
+            {
+                var strp = toJSON(o[keys[i]], depth + 1);
+
+                if (strp !== undefined)
+                {
+                    for (var j = 0; j < depth; ++j)
+                        parts.push(espace);
+
+                    parts.push(quote(keys[i]));        
+                    parts.push(": ");
+                    parts.push(strp);
+                    parts.push(",\n");
+                }
+            }
+
+            if (parts.length > 1)
+                parts.pop();
+
+            parts.push("\n");
+            for (var j = 0; j < depth - 1; ++j)
+                parts.push(espace);
+            parts.push("}");
+        }
 
         return parts.join("");
     }
 
     function arrayToJSON (
-        a
+        a,
+        depth
     )
     {
         var parts = [];
 
-        if (espace !== undefined && a.length > 0)
-            parts.push("[\n");
-        else
+        if (a.length === 0)
+            return "[]";
+
+        if (espace === undefined)
+        {
             parts.push("[");
 
-        for (var i = 0; i < a.length; ++i)
-        {
-            var strp = toJSON(a[i]);
+            for (var i = 0; i < a.length; ++i)
+            {
+                var strp = toJSON(a[i], depth + 1);
 
-            if (espace !== undefined)
-                parts.push(espace);
-
-            parts.push(strp);
-
-            if (espace !== undefined)
-                parts.push(",\n");
-            else
+                parts.push(strp);
                 parts.push(",");
-        }
+            }
 
-        if (a.length > 0)
-            parts.pop();
+            if (a.length > 0)
+                parts.pop();
 
-        if (espace !== undefined && a.length > 0)
-            parts.push("\n]");
-        else
             parts.push("]");
+        }
+        else
+        {
+            parts.push("[\n");
+
+            for (var i = 0; i < a.length; ++i)
+            {
+                var strp = toJSON(a[i], depth + 1);
+
+                for (var j = 0; j < depth; ++j)
+                    parts.push(espace);
+                parts.push(strp);
+                parts.push(",\n");
+            }
+
+            if (a.length > 0)
+                parts.pop();
+
+            parts.push("\n");
+            for (var j = 0; j < depth - 1; ++j)
+                parts.push(espace);
+            parts.push("]");
+        }
 
         return parts.join("");
     }
@@ -315,7 +350,7 @@ JSON.stringify = function (
         return parts.join("");
     }
 
-    return toJSON(value);
+    return toJSON(value, 1);
 }
 
 JSON.parse = function (
@@ -613,7 +648,7 @@ JSON.parse = function (
                 consume();
         }
 
-        return n;
+        return positive ? n : -n;
     }
 
     function walk (

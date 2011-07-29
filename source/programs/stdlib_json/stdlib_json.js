@@ -165,6 +165,8 @@ function test_stringify ()
         return 14;
     if ("[\n^1,\n^2,\n^3\n]" !== JSON.stringify([1, 2, 3], null, new String("^")))
         return 15;
+    if ("[\n 1,\n 2,\n [\n  3,\n  [\n   4\n  ],\n  5\n ],\n 6,\n 7\n]" !== JSON.stringify([1, 2, [3, [4], 5], 6, 7], null, 1))
+        return 16;
     if ("[]" !== JSON.stringify([], null, 1))
         return 17;
     if ("[1,2,[3,[4],5],6,7]" !== JSON.stringify([1, 2, [3, [4], 5], 6, 7], null))
