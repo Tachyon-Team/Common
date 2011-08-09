@@ -887,7 +887,7 @@ function Literal_7(p, DIVEQUAL)
 {
     var reg = p.scanner.parse_regexp([61]);
 
-    return new RegExpLiteral(DIV.loc, reg[0], reg[1]);
+    return new RegExpLiteral(DIVEQUAL.loc, reg[0], reg[1]);
 }
 
 function Property_1(p, IDENT, COLON, AssignmentExpr)
