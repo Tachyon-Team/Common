@@ -927,6 +927,12 @@ function ast_to_js(ast, ctx)
         }
         js_out("}", ctx);
     }
+    else if (ast instanceof RegExpLiteral)
+    {
+        js_out("/", ctx);
+        js_out(ast.pattern, ctx);
+        js_out("/", ctx);
+    }
     else if (ast instanceof Ref)
     {
         js_out(js_id_to_js(ast.id.toString()), ctx);
