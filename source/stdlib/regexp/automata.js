@@ -262,9 +262,6 @@ RegExpGroupNode.prototype.step = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# group node step");
-
     while (this.nextPath < this.transitions.length)
     {
         var next = this.transitions[this.nextPath].exec(context);
@@ -280,9 +277,6 @@ RegExpGroupNode.prototype.backtrack = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# backtrack group");
-
     // Restore index & captures from captures stack.
     var state = this.groupBacktrackStack[this.groupBacktrackStack.length - 1];
 
@@ -324,9 +318,6 @@ RegExpGroupOpenTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# group loop open exec");
-
     // Save state.
     if (!this.group.capture || this.group.capture !== context.captures[0])
     {
@@ -363,9 +354,6 @@ RegExpGroupCloseTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# group close exec");
-
     if (this.group.capture)
         this.group.capture.end = context.index;
 
@@ -389,9 +377,6 @@ RegExpCharMatchTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# char match exec"); 
-
     if (this.charCode === context.currentCharCode)
     {
         context.consume();
@@ -413,9 +398,6 @@ RegExpCharSetMatchTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# char set match exec"); 
-
     if (context.endOfInput())
         return null;
 
@@ -444,9 +426,6 @@ RegExpCharExSetMatchTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# exclusive char set match exec"); 
-
     if (context.endOfInput())
         return null;
 
@@ -475,9 +454,6 @@ RegExpBackRefMatchTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# back reference exec");
-
     if (this.capture.start < 0)
     {
         return this.destNode;
@@ -511,9 +487,6 @@ RegExpLoopOpenTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# loop open exec");
-
     this.destNode.reset();
     this.destNode.baseIndex = context.index;
     context.backtrackStack.push(this.destNode);
@@ -553,9 +526,6 @@ RegExpCharMatchLoopNode.prototype.step = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# char match loop node step");
-
     var next = this.nextTransition.exec(context);
 
     if (next === null &&
@@ -570,9 +540,6 @@ RegExpCharMatchLoopNode.prototype.backtrack = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# backtrack char match loop");
-
     if (this.times > 0)
     {
         context.setIndex(this.baseIndex + --(this.times));
@@ -594,9 +561,6 @@ RegExpCharMatchLoopTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# char match loop exec");
-
     if (++(this.destNode.times) >= this.destNode.max &&
         this.destNode.max > 0)
     {
@@ -638,9 +602,6 @@ RegExpCharMatchNonGreedyLoopNode.prototype.step = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# non greedy char match loop node step");
-
     var next = this.nextTransition.exec(context);
 
     if (next === null && this.nextTransition !== this.loopTransition)
@@ -673,9 +634,6 @@ RegExpCharMatchNonGreedyLoopTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# char match loop exec");
-
     ++(this.destNode.times);
     this.destNode.nextTransition = this.destNode.exitTransition;
 
@@ -713,9 +671,6 @@ RegExpGroupLoopNode.prototype.step = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# group loop node step");
-
     if (this.nextTransition === this.loopTransition)
         ++this.times;
 
@@ -764,9 +719,6 @@ RegExpGroupLoopTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# group loop exec");
-
     if (this.destNode.contextIndex === context.index)
         return null;
 
@@ -814,9 +766,6 @@ RegExpGroupNonGreedyLoopNode.prototype.step = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# group loop node step");
-
     if (this.nextTransition === this.loopTransition)
         ++this.times;
 
@@ -849,9 +798,6 @@ RegExpGroupNonGreedyLoopTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# group loop exec");
-
     if (this.destNode.contextIndex === context.index)
         return null;
 
@@ -896,9 +842,6 @@ RegExpBackRefLoopNode.prototype.step = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# back reference loop node step");
-
     this.indexBacktrackStack.push(context.index);
 
     if (this.nextTransition === this.loopTransition)
@@ -935,9 +878,6 @@ RegExpBackRefLoopTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# back reference loop exec");
-
     if (this.destNode.indexBacktrackStack[this.destNode.indexBacktrackStack.length - 1] === context.index)
         return null;
 
@@ -994,9 +934,6 @@ RegExpBackRefNonGreedyLoopNode.prototype.step = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# back reference loop node step");
-
     this.indexBacktrackStack.push(context.index);
 
     if (this.nextTransition === this.loopTransition)
@@ -1032,9 +969,6 @@ RegExpBackRefNonGreedyLoopTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# back reference loop exec");
-
     if (this.destNode.indexBacktrackStack[this.destNode.indexBacktrackStack.length - 1] === context.index)
         return null;
 
@@ -1074,9 +1008,6 @@ RegExpBOLAssertionTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# bol assertion exec");
-
     if (context.index === 0)
         return this.destNode;
 
@@ -1094,9 +1025,6 @@ RegExpMultilineBOLAssertionTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# multiline bol assertion exec");
-
     if (context.index === 0)
         return this.destNode;
 
@@ -1122,9 +1050,6 @@ RegExpEOLAssertionTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# eol assertion exec");
-
     if (context.endOfInput())
         return this.destNode;
     return null;
@@ -1141,9 +1066,6 @@ RegExpMultilineEOLAssertionTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# multiline eol assertion exec");
-
     if (context.endOfInput())
         return this.destNode;
 
@@ -1216,9 +1138,6 @@ RegExpLookaheadNode.prototype.step = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# lookahead node step");
-
     // Lookahead disjunction match has ended.
     if (this.nextTransition === this.exitTransition)
     {
@@ -1244,9 +1163,6 @@ RegExpLookaheadNode.prototype.backtrack = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# backtrack lookahead");
-
     // Backtracked from outside the inner lookahead disjunction.
     if (this.nextTransition === this.exitTransition)
     {
@@ -1275,9 +1191,6 @@ RegExpLookaheadOpenTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# lookahead open exec");
-
     this.destNode.reset();
     this.destNode.contextIndex = context.index;
     context.backtrackStack.push(this.destNode);
@@ -1295,9 +1208,6 @@ RegExpLookaheadMatchTransition.prototype.exec = function (
     context
 )
 {
-    if (REGEXPDEBUG)
-        print("# lookahead match exec");
-
     this.destNode.matched = true;
     this.destNode.nextTransition = this.destNode.exitTransition;
     return this.destNode;

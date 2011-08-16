@@ -40,8 +40,6 @@
  * _________________________________________________________________________
  */
 
-var REGEXPDEBUG = false;
-
 function RegExp (
     pattern,
     flags
@@ -75,7 +73,14 @@ function RegExp (
 
     // Parse pattern and compile it to an automata.
     var ast = new RegExpParser().parse(pattern); 
-    this._automata = astToAutomata(ast, this.global, this.ignoreCase, this.multiline);
+    
+    var prop = {
+      value: astToAutomata(ast, this.global, this.ignoreCase, this.multiline),
+      writable: false,
+      configurable: false,
+      enumerable: false
+    };
+    Object.defineProperty(this, "_automata", prop);
 }
 
 (function ()
@@ -92,6 +97,9 @@ RegExp.prototype.toString = function ()
     return this.source;
 }
 
+/**
+    15.10.6.2 RegExp.prototype.exec(string)
+*/
 RegExp.prototype.exec = function (
     input
 )
@@ -109,16 +117,18 @@ RegExp.prototype.exec = function (
         {
             nextNode = currentNode.step(context);
 
+            // No next step
             if (nextNode === null)
             {
-                // Build match array if there's no next step but the current node is final.
+                // Return the match if the current node is final.
                 if (currentNode._final)
                 {
+                    // Update last index propertie if global.
                     if (this.global)
                         this.lastIndex = context.index;
 
+                    // Build match array.
                     var matches = new Array(this._automata.captures.length);
-
                     for (var i = 0; i < this._automata.captures.length; ++i)
                     {
                         var capture = this._automata.captures[i];
@@ -136,6 +146,7 @@ RegExp.prototype.exec = function (
                     nextNode = context.getBTNode();
                 } while (nextNode && !nextNode.backtrack(context));
 
+                // If backtracking failed, try again with the input padded one character.
                 if (!nextNode)
                 {
                     ++padding;

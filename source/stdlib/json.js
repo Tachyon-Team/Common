@@ -63,296 +63,8 @@ JSON.toString = function ()
 }
 
 /**
-15.12.3 stringify(value, [, replace [, space ]])
+15.12.2 JSON.parse(text, [, reviver])
 */
-JSON.stringify = function (
-    value,
-    replacer,
-    space
-)
-{
-    // Holds references to stringified object to avoid cyclic evaluation.
-    var objStack = [];
-    var replacerFunction;
-    var propertyList;
-    var espace;
-
-    if (typeof replacer === "function")
-        replacerFunction = replacer;
-
-    if (replacer instanceof Array)
-    {
-        propertyList = [];
-
-        for (var i = 0; i < replacer.length; ++i)
-        {
-            var p = replacer[i].toString();
-
-            if (value[p] !== undefined)
-                propertyList.push(p);
-        }
-    }
-
-    if (space !== undefined)
-    {
-        if (typeof space === "number" || space instanceof Number)
-        {
-            espace = "";
-            for (var i = 0; i < space; ++i)
-                espace += " ";
-        } else if (typeof space === "string" || space instanceof String) {
-            if (space.length > 0)
-            {
-                if (space.length <= 10)
-                    espace = space.toString();
-                else
-                    espace = space.substring(0, 10);
-            }
-        }
-    }
-
-    function toJSON (
-        value,
-        depth
-    )
-    {
-        if (typeof value.toJSON === "function")
-           value = value.toJSON(); 
-
-        if (replacerFunction !== undefined)
-        {
-            // TODO:
-        }
-
-        if (value instanceof Number)
-            value = value.valueOf();
-        else if (value instanceof String)
-            value = value.valueOf();
-        else if (value instanceof Boolean)
-            value = value.valueOf();
-
-        if (value === null)
-            return "null";
-        else if (value === false)
-            return "false";
-        else if (value === true)
-            return "true";
-
-        if (typeof value === "string")
-            return quote(value);
-
-        if (typeof value === "number")
-            // TODO: return "null" if value is not finite.
-            return value.toString();
-
-        if (typeof value === "object")
-        {
-            // If value is already in objStack, a cyclic object is detected.
-            for (var i = 0; i < objStack.length; ++i)
-                if (objStack[i] === value)
-                    // FIXME: throw SyntaxError
-                    return undefined;
-
-            objStack.push(value);
-
-            if (value instanceof Array)
-                return arrayToJSON(value, depth);
-
-            return objectToJSON(value, depth);
-        }
-        return undefined;
-    }
-
-    function objectToJSON (
-        o,
-        depth
-    )
-    {
-        var keys = Object.keys(o);
-
-        if (keys.length === 0)
-            return "{}";
-
-        var parts = [];
-
-        if (espace === undefined)
-        {
-            parts.push("{");
-
-            for (var i = 0; i < keys.length; ++i)
-            {
-
-                var strp = toJSON(o[keys[i]], depth + 1);
-
-                if (strp !== undefined)
-                {
-                    parts.push(quote(keys[i]));        
-                    parts.push(":");
-                    parts.push(strp);
-                    parts.push(",");
-                }
-            }
-
-            if (parts.length > 1)
-                parts.pop();
-            parts.push("}");
-        }
-        else
-        {
-            parts.push("{\n");
-
-            for (var i = 0; i < keys.length; ++i)
-            {
-                var strp = toJSON(o[keys[i]], depth + 1);
-
-                if (strp !== undefined)
-                {
-                    for (var j = 0; j < depth; ++j)
-                        parts.push(espace);
-
-                    parts.push(quote(keys[i]));        
-                    parts.push(": ");
-                    parts.push(strp);
-                    parts.push(",\n");
-                }
-            }
-
-            if (parts.length > 1)
-                parts.pop();
-
-            parts.push("\n");
-            for (var j = 0; j < depth - 1; ++j)
-                parts.push(espace);
-            parts.push("}");
-        }
-
-        return parts.join("");
-    }
-
-    function arrayToJSON (
-        a,
-        depth
-    )
-    {
-        var parts = [];
-
-        if (a.length === 0)
-            return "[]";
-
-        if (espace === undefined)
-        {
-            parts.push("[");
-
-            for (var i = 0; i < a.length; ++i)
-            {
-                var strp = toJSON(a[i], depth + 1);
-
-                parts.push(strp);
-                parts.push(",");
-            }
-
-            if (a.length > 0)
-                parts.pop();
-
-            parts.push("]");
-        }
-        else
-        {
-            parts.push("[\n");
-
-            for (var i = 0; i < a.length; ++i)
-            {
-                var strp = toJSON(a[i], depth + 1);
-
-                for (var j = 0; j < depth; ++j)
-                    parts.push(espace);
-                parts.push(strp);
-                parts.push(",\n");
-            }
-
-            if (a.length > 0)
-                parts.pop();
-
-            parts.push("\n");
-            for (var j = 0; j < depth - 1; ++j)
-                parts.push(espace);
-            parts.push("]");
-        }
-
-        return parts.join("");
-    }
-
-    function quote (
-        s
-    )
-    {
-        // TODO: Control sequence escaping.
-        var parts = ["\""];
-
-        var i = 0, j = 0;
-        for (; i < s.length; ++i)
-        {
-            var c = s.charCodeAt(i);
-            var escapedSeq = undefined;
-
-            switch (c)
-            {
-                case 34: // '"'
-                // Escape double quote character.
-                escapedSeq = "\\\"";
-                break;
-
-                case 92: // '\'
-                // Escape backslash character.
-                escapedSeq = "\\\\";
-                break;
-
-                case 8: // '\b'
-                // Escape backspace character.
-                escapedSeq = "\\b";
-                break;
-
-                case 12: // '\f'
-                // Escape formfeed character.
-                escapedSeq = "\\f";
-                break;
-
-                case 10: // '\n'
-                // Escape linefeed character.
-                escapedSeq = "\\n";
-                break;
-
-                case 13: // '\r'
-                // Escape carriage return character.
-                escapedSeq = "\\r";
-                break;
-
-                case 9: // '\t'
-                // Escape tab character.
-                escapedSeq = "\\t";
-                break;
-            }
-
-            if (escapedSeq !== undefined)
-            {
-                if (j < i)
-                    parts.push(s.substring(j, i));
-
-                parts.push(escapedSeq);
-                j = i + 1;
-            }
-        }
-
-        if (j < i)
-            parts.push(s.substring(j, i));
-        parts.push("\"");
-
-        return parts.join("");
-    }
-
-    return toJSON(value, 1);
-}
-
 JSON.parse = function (
     text,
     reviver
@@ -657,7 +369,7 @@ JSON.parse = function (
     )
     {
         var value;
-        if (name === "")
+        if (name === null)
             value = holder;
         else
             value = holder[name]; 
@@ -671,7 +383,7 @@ JSON.parse = function (
                     var elt = walk(value, i.toString());
 
                     if (elt === undefined)
-                        // Delete a value in an array is not currently supported.
+                        // FIXME: Delete a value in an array is not currently supported.
                         // delete value[i.toString()];
                         value[i.toString()] = undefined;
                 }
@@ -693,7 +405,309 @@ JSON.parse = function (
 
     var r = parseJSON();
     if (reviver !== undefined)
-        walk(r, "");
+        walk(r, null);
     return r;
+}
+
+/**
+15.12.3 JSON.stringify(value, [, replace [, space ]])
+*/
+JSON.stringify = function (
+    value,
+    replacer,
+    space
+)
+{
+    // Holds references to stringified object to avoid cyclic evaluation.
+    var objStack = [];
+    var replacerFunction;
+    var propertyList;
+    var espace;
+
+    if (typeof replacer === "function")
+        replacerFunction = replacer;
+
+    if (replacer instanceof Array)
+    {
+        propertyList = [];
+
+        for (var i = 0; i < replacer.length; ++i)
+        {
+            var p = replacer[i].toString();
+
+            if (value[p] !== undefined)
+                propertyList.push(p);
+        }
+    }
+
+    if (space !== undefined)
+    {
+        if (typeof space === "number" || space instanceof Number)
+        {
+            var espaceParts = [];
+            for (var i = 0; i < space; ++i)
+                espaceParts.push(" ");
+            espace = espaceParts.join("");
+        } else if (typeof space === "string" || space instanceof String) {
+            if (space.length > 0)
+            {
+                if (space.length <= 10)
+                    espace = space.toString();
+                else
+                    espace = space.substring(0, 10);
+            }
+        }
+    }
+
+    function toJSON (
+        key,
+        holder,
+        depth
+    )
+    {
+        var value;
+
+        if (key === "")
+            value = holder;
+        else
+            value = holder[key];
+
+        if (typeof value.toJSON === "function")
+           value = value.toJSON(); 
+
+        if (replacerFunction !== undefined)
+            value = replacerFunction.call(holder, key, value);
+
+        if (value instanceof Number)
+            value = value.valueOf();
+        else if (value instanceof String)
+            value = value.valueOf();
+        else if (value instanceof Boolean)
+            value = value.valueOf();
+
+        if (value === null)
+            return "null";
+        else if (value === false)
+            return "false";
+        else if (value === true)
+            return "true";
+
+        if (typeof value === "string")
+            return quote(value);
+
+        if (typeof value === "number")
+            // TODO: return "null" if value is not finite.
+            return value.toString();
+
+        if (typeof value === "object")
+        {
+            // If value is already in objStack, a cyclic object is detected.
+            for (var i = 0; i < objStack.length; ++i)
+                if (objStack[i] === value)
+                    // FIXME: throw SyntaxError
+                    return undefined;
+
+            objStack.push(value);
+
+            if (value instanceof Array)
+                return arrayToJSON(value, depth);
+
+            return objectToJSON(value, depth);
+        }
+        return undefined;
+    }
+
+    function objectToJSON (
+        o,
+        depth
+    )
+    {
+        var keys;
+
+        if (propertyList === undefined)
+            keys = Object.keys(o);
+        else
+            keys = propertyList;
+
+        if (keys.length === 0)
+            return "{}";
+
+        var parts = [];
+
+        if (espace === undefined)
+        {
+            parts.push("{");
+
+            for (var i = 0; i < keys.length; ++i)
+            {
+                var strp = toJSON(keys[i], o, depth + 1);
+
+                if (strp !== undefined)
+                {
+                    parts.push(quote(keys[i]));        
+                    parts.push(":");
+                    parts.push(strp);
+                    parts.push(",");
+                }
+            }
+
+            if (parts.length > 1)
+                parts.pop();
+            parts.push("}");
+        }
+        else
+        {
+            parts.push("{\n");
+
+            for (var i = 0; i < keys.length; ++i)
+            {
+                var strp = toJSON(keys[i], o, depth + 1);
+
+                if (strp !== undefined)
+                {
+                    for (var j = 0; j < depth; ++j)
+                        parts.push(espace);
+
+                    parts.push(quote(keys[i]));        
+                    parts.push(": ");
+                    parts.push(strp);
+                    parts.push(",\n");
+                }
+            }
+
+            if (parts.length > 1)
+                parts.pop();
+
+            parts.push("\n");
+            for (var j = 0; j < depth - 1; ++j)
+                parts.push(espace);
+            parts.push("}");
+        }
+
+        return parts.join("");
+    }
+
+    function arrayToJSON (
+        a,
+        depth
+    )
+    {
+        var parts = [];
+
+        if (a.length === 0)
+            return "[]";
+
+        if (espace === undefined)
+        {
+            parts.push("[");
+
+            for (var i = 0; i < a.length; ++i)
+            {
+                var strp = toJSON(i.toString(), a, depth + 1);
+
+                parts.push(strp);
+                parts.push(",");
+            }
+
+            if (a.length > 0)
+                parts.pop();
+
+            parts.push("]");
+        }
+        else
+        {
+            parts.push("[\n");
+
+            for (var i = 0; i < a.length; ++i)
+            {
+                var strp = toJSON(i.toString(), a, depth + 1);
+
+                for (var j = 0; j < depth; ++j)
+                    parts.push(espace);
+                parts.push(strp);
+                parts.push(",\n");
+            }
+
+            if (a.length > 0)
+                parts.pop();
+
+            parts.push("\n");
+            for (var j = 0; j < depth - 1; ++j)
+                parts.push(espace);
+            parts.push("]");
+        }
+
+        return parts.join("");
+    }
+
+    function quote (
+        s
+    )
+    {
+        // TODO: Control sequence escaping.
+        var parts = ["\""];
+
+        var i = 0, j = 0;
+        for (; i < s.length; ++i)
+        {
+            var c = s.charCodeAt(i);
+            var escapedSeq = undefined;
+
+            switch (c)
+            {
+                case 34: // '"'
+                // Escape double quote character.
+                escapedSeq = "\\\"";
+                break;
+
+                case 92: // '\'
+                // Escape backslash character.
+                escapedSeq = "\\\\";
+                break;
+
+                case 8: // '\b'
+                // Escape backspace character.
+                escapedSeq = "\\b";
+                break;
+
+                case 12: // '\f'
+                // Escape formfeed character.
+                escapedSeq = "\\f";
+                break;
+
+                case 10: // '\n'
+                // Escape linefeed character.
+                escapedSeq = "\\n";
+                break;
+
+                case 13: // '\r'
+                // Escape carriage return character.
+                escapedSeq = "\\r";
+                break;
+
+                case 9: // '\t'
+                // Escape tab character.
+                escapedSeq = "\\t";
+                break;
+            }
+
+            if (escapedSeq !== undefined)
+            {
+                if (j < i)
+                    parts.push(s.substring(j, i));
+
+                parts.push(escapedSeq);
+                j = i + 1;
+            }
+        }
+
+        if (j < i)
+            parts.push(s.substring(j, i));
+        parts.push("\"");
+
+        return parts.join("");
+    }
+
+    return toJSON("", value, 1);
 }
 
