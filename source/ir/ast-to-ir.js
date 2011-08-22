@@ -2056,7 +2056,7 @@ function exprToIR(context)
             if (curFunc.childFuncs[f].astNode === astExpr)
                 nestFunc = curFunc.childFuncs[f];
 
-        // Ensure that he nested function was found
+        // Ensure that the nested function was found
         assert (
             nestFunc !== null,
             'nested function not found for function expression'

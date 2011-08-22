@@ -57,7 +57,7 @@ function main()
     var opt_warn = false;
     var opt_ast = false;
     var opt_nojs = false;
-    var opt_eventrec = false;
+    var opt_heavy_profiler = false;
     var files = [];
     var i = 0;
 
@@ -71,8 +71,8 @@ function main()
             opt_ast = true;
         else if (args[i] === "-nojs")
             opt_nojs = true;
-        else if (args[i] === "-eventrec")
-            opt_eventrec = true;
+        else if (args[i] === "-heavy_profiler")
+            opt_heavy_profiler = true;
         else
             break;
         i++;
@@ -96,7 +96,7 @@ function main()
                            new BlockStatement(prog.loc,
                                               Array.prototype.concat.apply([], statements)));
 
-        var normalized_prog = ast_normalize(prog, opt_debug, opt_eventrec, files);
+        var normalized_prog = ast_normalize(prog, opt_debug, opt_heavy_profiler, files);
 
         if (opt_ast)
             pp(normalized_prog);

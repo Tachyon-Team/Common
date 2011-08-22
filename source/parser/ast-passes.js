@@ -314,11 +314,23 @@ function ast_walk_exprs(asts, ctx)
 function ast_pass0_ctx(userFiles)
 {
     this.userFiles = userFiles;    //Files corresponding to the user program
-    this.funcDeclId = undefined;        //The id of the function declaration encapsulating the function expression intrumentalized
+    this.funcDeclId = undefined;   //The id of the function declaration encapsulating the function expression intrumentalized
     this.args = [];
     this.inCallExpr = false;       //True during parsing of a function call
-    this.depth = 0;                //The depth of the latest function call
-    this.calls_per_depth = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];  //Array tracking the number of function calls per depth (< 20)
+    this.inFuncDecl = false;       //True during parsing of a function declaration
+    this.inFuncExpr = false;       //True during parsing of a function expression
+    this.depth = [];                //The depth of function calls as they are statically read
+    this.calls_per_depth = [0,0,0,0,0,0,0];  //Array tracking the number of function calls per depth
+    this.last_depth = 0;
+}
+
+ast_pass0_ctx.prototype.walk_statements = function (asts)
+{
+    asts.forEach(function (ast, i, asts)
+                 {
+                     asts[i] = this.walk_statement(ast);
+                 });
+    return asts;
 }
 
 
@@ -330,17 +342,19 @@ ast_pass0_ctx.prototype.walk_statement = function (ast)
         return ast;
     }
 
-    //TODO: Call to a primitive for a "Function calls/depth" report
+    //Include a call to a primitive for a "Function calls/depth" report
     else if (ast instanceof Program) {
         ast_walk_statement(ast, this);
 
-        var print = "prof_recordFuncCallsPerDepth([" + this.calls_per_depth + "]);";
+        if(this.filter_prof(ast)){
+            var print = "prof_recordFuncCallsPerDepth([" + this.calls_per_depth + "]);";
 
-        var s = new Scanner(new String_input_port(print));
-        var p = new Parser(s, false);
-        var prog = p.parse();
+            var s = new Scanner(new String_input_port(print));
+            var p = new Parser(s, false);
+            var prog = p.parse();
 
-        ast.block.statements = ast.block.statements.concat(prog.block.statements);
+            ast.block.statements = ast.block.statements.concat(prog.block.statements);
+        }
         return ast;
     }
 
@@ -352,11 +366,30 @@ ast_pass0_ctx.prototype.walk_statement = function (ast)
 
     else if (ast instanceof FunctionDeclaration)
     {
-        //Remember the function's id 
-        this.funcDeclId = ast.id.toString();
+        if(this.filter_prof(ast)){
 
-        ast.funct = this.walk_expr(ast.funct);
-        return ast;
+            //Remember the function's id 
+            this.funcDeclId = ast.id.toString();
+    
+            if(this.inFuncDecl){
+                return  new ExprStatement(ast.loc,
+                            new OpExpr(ast.loc, "x = y",
+                                [new Ref(ast.loc, ast.id),
+                                 this.walk_expr(ast.funct)]
+                            )
+                        );
+            }
+            else{
+                this.inFuncDecl = true;
+                ast.funct = this.walk_expr(ast.funct);
+                this.inFuncDecl = false;
+                return ast;
+            }
+        }
+        else{
+            ast.funct = this.walk_expr(ast.funct);
+            return(ast);
+        }
     }
 
     //Function return statement instrumentalization
@@ -378,7 +411,9 @@ ast_pass0_ctx.prototype.walk_statement = function (ast)
                         new CallExpr(ast.loc,
                             new Ref(ast.loc, new Token(IDENT_CAT, "prof_recordFuncStop", ast.loc)),
                             [new CallExpr(ast.loc, 
-                                 new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), [])
+                                 new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), []),
+                             new CallExpr(ast.loc, 
+                                 new Ref(ast.loc, new Token(IDENT_CAT, "memAllocatedKBs", ast.loc)), []),
                             ]
                         )
                     ), 
@@ -402,7 +437,9 @@ ast_pass0_ctx.prototype.walk_statement = function (ast)
                          new CallExpr(ast.loc,
                             new Ref(ast.loc, new Token(IDENT_CAT, "prof_recordFuncStop", ast.loc)),
                             [new CallExpr(ast.loc, 
-                                 new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), [])
+                                 new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), []),
+                             new CallExpr(ast.loc, 
+                                 new Ref(ast.loc, new Token(IDENT_CAT, "memAllocatedKBs", ast.loc)), []),
                              //new Ref(ast.loc, new Token(IDENT_CAT, this.args.pop(), ast.loc))
                             ]
                         )), 
@@ -431,77 +468,163 @@ ast_pass0_ctx.prototype.walk_expr = function (ast)
     //Function body instrumentalization
     else if (ast instanceof FunctionExpr)
     {
+        if(this.inFuncExpr) {
+            var tempFuncDeclId = this.funcDeclId;
+            this.funcDeclId = undefined;
+    
+            ast_walk_statements(ast.body, this);
 
-        ast_walk_statements(ast.body, this);
-
-        if (this.filter_prof(ast))
-        {
-           //Record the entering of the function
-           ast.body.unshift(
-                new ExprStatement(ast.loc, 
-                    new CallExpr(
-                        ast.loc,
-                        new Ref(ast.loc, new Token(IDENT_CAT, "prof_recordFuncStart", ast.loc)),
-                        [new CallExpr(ast.loc, new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), []),
-                         new Literal(ast.loc, this.funcDeclId),
-                         new Literal(ast.loc, ast.loc.to_string())
-//                         new Ref(ast.loc, new Token(IDENT_CAT, ast.params.toString(), ast.loc))
-                        ]
+            if (this.filter_prof(ast))
+            {
+               //Record the entering of the function
+               ast.body.unshift(
+                    new ExprStatement(ast.loc, 
+                        new CallExpr(
+                            ast.loc,
+                            new Ref(ast.loc, new Token(IDENT_CAT, "prof_recordFuncStart", ast.loc)),
+                            [new CallExpr(ast.loc, 
+                                 new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), []),
+                             new CallExpr(ast.loc, 
+                                 new Ref(ast.loc, new Token(IDENT_CAT, "memAllocatedKBs", ast.loc)), []),
+                             new Literal(ast.loc, tempFuncDeclId),
+                             new Literal(ast.loc, ast.loc.to_string())
+//                             new Ref(ast.loc, new Token(IDENT_CAT, ast.params.toString(), ast.loc))
+                            ]
+                        )
                     )
-                )
-           );
-           this.funcDeclId = undefined;
-            
+               );
+               var tempFuncDeclId = undefined;
 
-           //Record the exiting of the function (if no return statement was encountered during its execution)
-           ast.body.push(
-                new ExprStatement(ast.loc, 
-                    new CallExpr(ast.loc,
-                        new Ref(ast.loc, new Token(IDENT_CAT, "prof_recordFuncStop", ast.loc)),
-                        [new CallExpr(ast.loc, 
-                             new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), [])
-                        ]
+               //Record the exiting of the function (if no return statement was encountered during its execution)
+               ast.body.push(
+                    new ExprStatement(ast.loc, 
+                        new CallExpr(ast.loc,
+                            new Ref(ast.loc, new Token(IDENT_CAT, "prof_recordFuncStop", ast.loc)),
+                            [new CallExpr(ast.loc, 
+                                 new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), []),
+                             new CallExpr(ast.loc, new Ref(ast.loc, new Token(IDENT_CAT, "memAllocatedKBs", ast.loc)), []),
+                            ]
+                        )
                     )
-                )
-            );
+                );
+            }
+        }
+        else{
+            this.inFuncExpr = true;
+            var tempFuncDeclId = this.funcDeclId;
+            this.funcDeclId = undefined;
+    
+            ast_walk_statements(ast.body, this);
+    
+            if (this.filter_prof(ast))
+            {
+               //Record the entering of the function
+               ast.body.unshift(
+                    new ExprStatement(ast.loc, 
+                        new CallExpr(
+                            ast.loc,
+                            new Ref(ast.loc, new Token(IDENT_CAT, "prof_recordFuncStart", ast.loc)),
+                            [new CallExpr(ast.loc, 
+                                 new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), []),
+                             new CallExpr(ast.loc, 
+                                 new Ref(ast.loc, new Token(IDENT_CAT, "memAllocatedKBs", ast.loc)), []),
+                             new Literal(ast.loc, tempFuncDeclId),
+                             new Literal(ast.loc, ast.loc.to_string())
+//                             new Ref(ast.loc, new Token(IDENT_CAT, ast.params.toString(), ast.loc))
+                            ]
+                        )
+                    )
+               );
+               var tempFuncDeclId = undefined;
+
+               //Record the exiting of the function (if no return statement was encountered during its execution)
+               ast.body.push(
+                    new ExprStatement(ast.loc, 
+                        new CallExpr(ast.loc,
+                            new Ref(ast.loc, new Token(IDENT_CAT, "prof_recordFuncStop", ast.loc)),
+                            [new CallExpr(ast.loc, 
+                                 new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), []),
+                             new CallExpr(ast.loc, new Ref(ast.loc, new Token(IDENT_CAT, "memAllocatedKBs", ast.loc)), []),
+                            ]
+                        )
+                    )
+                );
+            }
+
+            this.inFuncExpr = false;
         }
 
-        // Return the instrumentalized function
         return ast;
     }
 
     
     else if (ast instanceof CallExpr)
     {
-        //In Call Expression => enable tracking of depth of function call
-        if(ast.fn instanceof OpExpr){
-            this.inCallExpr = true;
+        if(this.filter_prof(ast)){
+        
+            //If not in a function declration and not in a function expression 
+            //                => call occurs on global level and must be profiled
+            if(!this.inFuncDecl && !this.inFuncExpr) {//TODO: use scope property to determine if call is global
 
-            ast.fn = this.walk_expr(ast.fn);
-            ast.args = ast_walk_exprs(ast.args, this);
+                //In Call Expression => enable tracking of depth of function call
+                if(ast.fn instanceof OpExpr){
+                    this.inCallExpr = true; //Enabling
+                    this.depth.push(0); 
+    
+                    ast.fn = this.walk_expr(ast.fn);
+                    ast.args = ast_walk_exprs(ast.args, this);
 
+                    //End of Call Expression => disable tracking of depth of function call
+                    this.inCallExpr = false;
 
-            if(this.depth < 20)
-                this.calls_per_depth[this.depth] += 1;
-            this.depth = 0;
+                    var measured_depth = this.depth.pop();
+
+                    if(measured_depth < 6)
+                        this.calls_per_depth[measured_depth] += 1;
+                    else this.calls_per_depth[6] += 1;
+
+                    ast = new CallExpr(ast.loc,
+                            new Ref(ast.loc, 
+                                new Token(IDENT_CAT, "prof_recordDynamicFuncCall", ast.loc)),
+                            [new Literal(ast.loc, measured_depth), ast]
+                        );   
+                }
+
+                //No indirection => direct call to a global function
+                //TODO: distinguish stdlib calls?
+                else{
+                    ast.fn = this.walk_expr(ast.fn);
+                    ast.args = ast_walk_exprs(ast.args, this);
+                    this.calls_per_depth[0] += 1;
+
+                    ast = new CallExpr(ast.loc,
+                            new Ref(ast.loc, 
+                                new Token(IDENT_CAT, "prof_recordDynamicFuncCall", ast.loc)),
+                            [new Literal(ast.loc, 0), ast]
+                    );
+                }
+
+            }
+        
+            else {
+                ast.fn = this.walk_expr(ast.fn);
+                ast.args = ast_walk_exprs(ast.args, this);        
+            }
         }
         else{
             ast.fn = this.walk_expr(ast.fn);
-            ast.args = ast_walk_exprs(ast.args, this);
-            this.calls_per_depth[0] += 1;
+            ast.args = ast_walk_exprs(ast.args, this);        
         }
-
-        //End of Call Expression => disable tracking of depth of function call
-        this.inCallExpr = false;
-
         return ast;
     }
 
     //Each OpExpr of "op" attribute 'x [ y ]' in CallExpr corresponds to a propertie reference => increment depth
     else if (ast instanceof OpExpr)
     {
-        if(this.inCallExpr && ast.op === 'x [ y ]')
-            this.depth++;
+        if(this.filter_prof(ast) && this.inCallExpr && ast.op === 'x [ y ]'){
+            var last_index = this.depth.length - 1;
+            this.depth[last_index]++;
+        }
         ast.exprs = ast_walk_exprs(ast.exprs, this);
         return ast;
     }
@@ -690,9 +813,10 @@ function ast_pass1(ast)
 // 1. Free variables can come from nested sub-functions.
 // 2. Free variable resolution and must be done after pass 2
 
-function ast_pass2_ctx(ast)
+function ast_pass2_ctx(ast, userFiles)
 {
     this.ast = ast;
+    this.userFiles = userFiles;
 }
 
 ast_pass2_ctx.prototype.walk_statement = function (ast)
@@ -720,7 +844,7 @@ ast_pass2_ctx.prototype.walk_expr = function (ast)
     else if (ast instanceof FunctionExpr)
     {
         // Create a new context to traverse the function body
-        var new_ctx = new ast_pass2_ctx(ast);
+        var new_ctx = new ast_pass2_ctx(ast, this.userFiles);
 
         // Traverse the function body
         ast_walk_statements(ast.body, new_ctx);
@@ -735,7 +859,7 @@ ast_pass2_ctx.prototype.walk_expr = function (ast)
         // TODO: eliminate when ids are fixed
         var symName = ast.id.toString();
 
-        if (symName === "arguments")
+        if (symName === "arguments" || this.filter_prof(ast))
             this.ast.usesArguments = true;
 
         else if (symName === "eval")
@@ -750,9 +874,17 @@ ast_pass2_ctx.prototype.walk_expr = function (ast)
     }
 };
 
-function ast_pass2(ast)
+//Profiling filter: instrumentalization of user code only
+ast_pass2_ctx.prototype.filter_prof = function (ast)
 {
-    var ctx = new ast_pass2_ctx(ast);
+    if (this.userFiles.indexOf(ast.loc.filename) != -1)
+        return true;
+    return false;
+};
+
+function ast_pass2(ast, userFiles)
+{
+    var ctx = new ast_pass2_ctx(ast, userFiles);
     ctx.walk_statement(ast);
 }
 
@@ -1291,13 +1423,16 @@ function ast_pass5(ast)
 
 function ast_normalize(ast, debug, profiling, userFiles)
 {
-    // If profiling mode enabled, instrumentalize the code to produce function call report
+    // If profiling mode enabled, instrumentalize the code to produce profiling reports
     if (profiling)
         ast_pass0(ast, userFiles);
 
     if (debug)
         ast_pass1(ast);
-    ast_pass2(ast);
+
+    if(profiling) ast_pass2(ast, userFiles);
+    else ast_pass2(ast, []);
+
     ast_pass3(ast);
     ast_pass4(ast);
     ast_pass5(ast);

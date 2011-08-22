@@ -548,11 +548,6 @@ function heapAlloc(size)
     // If this allocation exceeds the heap limit
     if (nextPtr >= heapLimit)
     {
-            prof_allocReport();
-            prof_propGetReport();
-            prof_propPutReport();
-            prof_funcCallReport();
-            prof_funcCallsPerDepthReport();	
         //printInt(pint(1111111));
 
         // Log that we are going to perform GC
@@ -1923,7 +1918,7 @@ function getOwnPropObj(obj, propName, propHash)
 /**
 Get a property from an object or its prototype chain
 */
-function getPropObj(obj, propName, propHash)
+function getPropObj(obj, propName, propHash, objType)
 {
     "tachyon:inline";
     "tachyon:noglobal";
@@ -1950,8 +1945,13 @@ function getPropObj(obj, propName, propHash)
                         
             //Profiling: record propertie access event
             if(!boxIsFunc(prop)){
-                var globalObj = getGlobalObj();
                 prof_recordPropGet(propName);
+            }
+            else{
+                if(propName == "hasOwnProperty")
+                    prof_recordStdLibCall("x_hasOwnProperty_x", objType);
+                else 
+                    prof_recordStdLibCall(propName, objType);
             }
             
             return prop;
@@ -2378,9 +2378,26 @@ function getPropVal(obj, propName)
     "tachyon:static";
     "tachyon:noglobal";
 
+    var objType = 0;
+
+    if (boxIsObj(obj))
+    {
+        //Prof: objType is obj
+        objType = 1;
+    }
+
+    if (boxIsFunc(obj))
+    {
+        //Prof: objType is obj
+        objType = 4;
+    }
+
     // If this is an array
     if (boxIsArray(obj))
     {
+        //Prof: objType is array
+        objType = 2;
+
         if (boxIsInt(propName))
         {
             if (propName >= 0)
@@ -2421,6 +2438,9 @@ function getPropVal(obj, propName)
     // If this is a string
     else if (boxIsString(obj))
     {
+        //Prof: objType is string
+        objType = 3;
+
         if (propName === 'length')
         {
             return boxInt(iir.icast(IRType.pint, get_str_size(obj)));
@@ -2488,7 +2508,7 @@ function getPropVal(obj, propName)
     var propHash = iir.icast(IRType.pint, get_str_hash(propName));
 
     // Attempt to find the property on the object
-    var prop = getPropObj(obj, propName, propHash);
+    var prop = getPropObj(obj, propName, propHash, objType);
 
     // If the property isn't defined
     if (iir.icast(IRType.pint, prop) === BIT_PATTERN_NOT_FOUND)
@@ -2590,7 +2610,7 @@ function hasPropVal(obj, propName)
     var propHash = iir.icast(IRType.pint, get_str_hash(propName));
 
     // Attempt to find the property on the object
-    var prop = getPropObj(obj, propName, propHash);
+    var prop = getPropObj(obj, propName, propHash, 4);
 
     // Test if the property was found
     return iir.icast(IRType.pint, prop) !== BIT_PATTERN_NOT_FOUND;
@@ -2748,7 +2768,7 @@ function getGlobal(obj, propName, propHash)
     "tachyon:arg propHash pint";
 
     // Attempt to find the property on the object
-    var prop = getPropObj(obj, propName, propHash);
+    var prop = getPropObj(obj, propName, propHash, 5);
 
     // If the property isn't defined
     if (iir.icast(IRType.pint, prop) === BIT_PATTERN_NOT_FOUND)
@@ -2773,7 +2793,7 @@ function getGlobalFunc(obj, propName, propHash)
     "tachyon:arg propHash pint";
 
     // Attempt to find the property on the object
-    var prop = getPropObj(obj, propName, propHash);
+    var prop = getPropObj(obj, propName, propHash, 6);
 
     // If the property is a function
     if (boxIsFunc(prop))
@@ -3023,6 +3043,8 @@ function prof_init(){
     "tachyon:noglobal";
 
     var prof = {
+        
+        //Data for allocation report
         "allocs": 0,
         "box_allocs": 0,
         "ref_allocs": 0,
@@ -3033,32 +3055,171 @@ function prof_init(){
         "tag_float": 0,
         "tag_string": 0,
         "tag_other": 0,
+        "alloc_order": "",
+
+        //Data for get report
         "prop_gets": 0,
+        "accessed_properties": [],
+
+        //Data for put report
         "prop_puts": 0,
-        "accessed_properties": "",
-        "modified_properties": "",
+        "modified_properties": [],
+
+        //Data for function calls report
         "func_calls": 0,
         "functions": "",
-        "alloc_report": "",
-        "prop_get_report": "",
-        "prop_put_report": "",
-        "func_call_report": "",
-        "test": 0,
 	"func_start_time": [],
+        "func_start_mem": [],
         "func_name": [],
         "func_loc": [],
         "func_args": [],
         "func_loc_name_time_assoc": [],
         "func_last_loc": "",
         "func_recursion_depth": 0,
-        "func_calls_per_depth": [],
-        "func_calls_per_depth_report": ""
+        "start_mem_alloc_KBs": memAllocatedKBs(),
+        "total_mem_alloc_KBs": 0,
+
+        //Data for test report
+        "test": 0,
+        "text_test": "",
+
+        //Data for function calls per depth of indirection report
+        "static_func_calls_per_depth": [],
+        "dynamic_func_calls_per_depth": [0,0,0,0,0,0,0],
+
+        //Data for standard library functions called report
+        "std_lib_array_functions": prof_init_std_lib_array_functions(),
+        "std_lib_array_was_called": false,
+        "std_lib_math_functions": prof_init_std_lib_math_functions(),
+        "std_lib_math_was_called": false,
+        "std_lib_object_functions": prof_init_std_lib_object_functions(),
+        "std_lib_object_was_called": false,
+        "std_lib_Object_called": false,
+        "std_lib_string_functions": prof_init_std_lib_string_functions(),
+        "std_lib_string_was_called": false,
+        "std_lib_function_functions": prof_init_std_lib_function_functions(),
+        "std_lib_function_was_called": false,
+        "std_lib_print_calls": 0,
+
+
+        //Text to print for each report
+        "alloc_report": "",
+        "prop_get_report": "",
+        "prop_put_report": "",
+        "func_call_report": "",
+        "func_calls_per_depth_report": "",
+        "std_lib_functions_called_report": ""
     };
     var ctx = iir.get_ctx();
     set_ctx_profdata(ctx, prof);
 
     prof_enable();
     return 0;
+}
+
+function prof_init_std_lib_array_functions(){
+    "tachyon:static";
+    "tachyon:noglobal";
+
+    var std_lib_array_functions = [];
+
+    std_lib_array_functions["concat"] = 0;
+    std_lib_array_functions["toString"] = 0;
+    std_lib_array_functions["join"] = 0;
+    std_lib_array_functions["pop"] = 0;
+    std_lib_array_functions["push"] = 0;
+    std_lib_array_functions["reverse"] = 0;
+    std_lib_array_functions["shift"] = 0;
+    std_lib_array_functions["slice"] = 0;
+    std_lib_array_functions["sort"] = 0;
+    std_lib_array_functions["splice"] = 0;
+    std_lib_array_functions["unshift"] = 0;
+    std_lib_array_functions["indexOf"] = 0;
+    std_lib_array_functions["lastIndexOf"] = 0;
+    std_lib_array_functions["forEach"] = 0;
+    std_lib_array_functions["map"] = 0;
+    std_lib_array_functions["filter"] = 0;
+
+    return std_lib_array_functions;
+}
+
+function prof_init_std_lib_math_functions(){
+    "tachyon:static";
+    "tachyon:noglobal";
+
+    var std_lib_math_functions = [];
+
+    std_lib_math_functions["abs"] = 0;
+    std_lib_math_functions["ceil"] = 0;
+    std_lib_math_functions["floor"] = 0;
+    std_lib_math_functions["max"] = 0;
+    std_lib_math_functions["min"] = 0;
+    std_lib_math_functions["pow"] = 0;
+
+    return std_lib_math_functions;
+}
+
+function prof_init_std_lib_object_functions(){
+    "tachyon:static";
+    "tachyon:noglobal";
+
+    var std_lib_object_functions = [];
+
+    std_lib_object_functions["create"] = 0;
+    std_lib_object_functions["getPrototypeOf"] = 0;
+    std_lib_object_functions["defineProperty"] = 0;
+    std_lib_object_functions["x_hasOwnProperty_x"] = 0;
+    std_lib_object_functions["isFrozen"] = 0;
+    std_lib_object_functions["isExtensible"] = 0;
+    std_lib_object_functions["isPrototypeOf"] = 0;
+    std_lib_object_functions["toString"] = 0;
+    std_lib_object_functions["valueOf"] = 0;
+
+    return std_lib_object_functions;
+}
+
+function prof_init_std_lib_string_functions(){
+    "tachyon:static";
+    "tachyon:noglobal";
+
+    var std_lib_string_functions = [];
+
+    std_lib_string_functions["toString"] = 0;
+    std_lib_string_functions["charCodeAt"] = 0;
+    std_lib_string_functions["valueOf"] = 0;
+    std_lib_string_functions["charAt"] = 0;
+    std_lib_string_functions["concat"] = 0;
+    std_lib_string_functions["indexOf"] = 0;
+    std_lib_string_functions["lastIndexOf"] = 0;
+    std_lib_string_functions["localeCompare"] = 0;
+    std_lib_string_functions["slice"] = 0;
+    std_lib_string_functions["match"] = 0;
+    std_lib_string_functions["replace"] = 0;
+    std_lib_string_functions["search"] = 0;
+    std_lib_string_functions["split"] = 0;
+    std_lib_string_functions["substring"] = 0;
+    std_lib_string_functions["substr"] = 0;
+    std_lib_string_functions["toLowerCase"] = 0;
+    std_lib_string_functions["toLocaleLowerCase"] = 0;
+    std_lib_string_functions["toUpperCase"] = 0;
+    std_lib_string_functions["toLocaleUpperCase"] = 0;
+    std_lib_string_functions["internal_isWhiteSpace"] = 0;
+    std_lib_string_functions["trim"] = 0;
+
+    return std_lib_string_functions;
+}
+
+function prof_init_std_lib_function_functions(){
+    "tachyon:static";
+    "tachyon:noglobal";
+
+    var std_lib_function_functions = [];
+
+    std_lib_function_functions["toString"] = 0;
+    std_lib_function_functions["apply"] = 0;
+    std_lib_function_functions["call"] = 0;
+
+    return std_lib_function_functions;
 }
 
 function prof_enable() {
@@ -3100,15 +3261,67 @@ function prof_recordBoxAlloc(tagVal){
     var enabled = get_ctx_profenable(ctx);
     if (enabled) {
         prof_disable();
+
         var data = get_ctx_profdata(ctx);
+
         data.box_allocs += 1;
-        if(tagVal === pint(0)) data.tag_immediate_int++;
-        if(tagVal === pint(7)) data.tag_object++;
-        if(tagVal === pint(6)) data.tag_function++;
-        if(tagVal === pint(5)) data.tag_array++;
-        if(tagVal === pint(3)) data.tag_float++;
-        if(tagVal === pint(2)) data.tag_string++;
-        if(tagVal === pint(1)) data.tag_other++;
+
+        var func_loc_length = data.func_loc.length - 1;
+        var loc = data.func_loc[func_loc_length];
+
+if(data.func_loc_name_time_assoc.hasOwnProperty(loc))
+        data.func_loc_name_time_assoc[loc][9]++;
+
+        if(tagVal === pint(0)) {
+            data.tag_immediate_int++;
+            if(data.func_loc_name_time_assoc.hasOwnProperty(loc)){
+                data.func_loc_name_time_assoc[loc][2]++;
+                data.alloc_order += "int" + "\n";
+            }
+        }
+        if(tagVal === pint(7)) {
+            data.tag_object++;
+            if(data.func_loc_name_time_assoc.hasOwnProperty(loc)){
+                data.func_loc_name_time_assoc[loc][3]++;
+                data.alloc_order += "object" + "\n";
+            }
+        }
+        if(tagVal === pint(6)) {
+            data.tag_function++;
+            if(data.func_loc_name_time_assoc.hasOwnProperty(loc)){
+                data.func_loc_name_time_assoc[loc][4]++;
+                data.alloc_order += "function" + "\n";
+            }
+        }
+        if(tagVal === pint(5)) {
+            data.tag_array++;
+            if(data.func_loc_name_time_assoc.hasOwnProperty(loc)){
+                data.func_loc_name_time_assoc[loc][5]++;
+                data.alloc_order += "array" + "\n";
+            }
+        }
+        if(tagVal === pint(3)) {
+            data.tag_float++; 
+            if(data.func_loc_name_time_assoc.hasOwnProperty(loc)){
+                data.func_loc_name_time_assoc[loc][6]++;
+                data.alloc_order += "float" + "\n";
+            }
+        }
+        if(tagVal === pint(2)) {
+            data.tag_string++;
+            if(data.func_loc_name_time_assoc.hasOwnProperty(loc)){
+                data.func_loc_name_time_assoc[loc][7]++;
+                data.alloc_order += "string" + "\n";
+            }
+        }
+        if(tagVal === pint(1)) {
+            data.tag_other++;
+            if(data.func_loc_name_time_assoc.hasOwnProperty(loc)){
+                data.func_loc_name_time_assoc[loc][8]++;
+                data.alloc_order += "other" + "\n";
+            }
+        }
+
         prof_enable();
     }
 }
@@ -3127,7 +3340,7 @@ function prof_recordRefAlloc(){
     }
 }
 
-function prof_recordFuncStart(time, funcName, ast_loc/*, args*/){
+function prof_recordFuncStart(time, mem, funcName, ast_loc/*, args*/){
     "tachyon:static";
     "tachyon:noglobal";
 
@@ -3138,27 +3351,42 @@ function prof_recordFuncStart(time, funcName, ast_loc/*, args*/){
 
         var data = get_ctx_profdata(ctx);
 
+        //If recording a recursive procedure, record as a single function call
         if(ast_loc == data.func_last_loc)
             data.func_recursion_depth++;
+
         else {
             data.func_last_loc = ast_loc;
             data.func_start_time.push(time);
+            data.func_start_mem.push(mem);
             data.func_name.push(funcName);
             data.func_loc.push(ast_loc);
         
         //data.func_args.push(args);
-       
+            
+            //If recording the first encounter of the function, initialize an array cell associated with said function
             if(!data.func_loc_name_time_assoc.hasOwnProperty(ast_loc)){
                 data.func_loc_name_time_assoc[ast_loc] = [];
                 data.func_loc_name_time_assoc[ast_loc][0] = funcName;
-                data.func_loc_name_time_assoc[ast_loc][1] = 0;
+                data.func_loc_name_time_assoc[ast_loc][1] = 0; //Time spent in function "funcName" (ms)
+                data.func_loc_name_time_assoc[ast_loc][2] = 1; //Number of times the function is called
+                data.func_loc_name_time_assoc[ast_loc][3] = 0; //Number of objects allocated in function "funcName"
+                data.func_loc_name_time_assoc[ast_loc][4] = 0; //Number of functions allocated in function "funcName"
+                data.func_loc_name_time_assoc[ast_loc][5] = 0; //Number of arrays allocated in function "funcName"
+                data.func_loc_name_time_assoc[ast_loc][6] = 0; //Number of floats allocated in function "funcName"
+                data.func_loc_name_time_assoc[ast_loc][7] = 0; //Number of strings allocated in function "funcName"
+                data.func_loc_name_time_assoc[ast_loc][8] = 0; //Number of other types allocated in function "funcName"
+                data.func_loc_name_time_assoc[ast_loc][9] = 0; //Total number of box allocations
+                data.func_loc_name_time_assoc[ast_loc][10] = 0; //Total memory allocated in KBs
             }
+            else
+                data.func_loc_name_time_assoc[ast_loc][2]++;
         }
         prof_enable();
     }
 }
 
-function prof_recordFuncStop(time){
+function prof_recordFuncStop(time, mem){
     "tachyon:static";
     "tachyon:noglobal";
 
@@ -3168,37 +3396,15 @@ function prof_recordFuncStop(time){
         prof_disable();
         var data = get_ctx_profdata(ctx);
         data.func_calls++;
-//        var total_time = time - data.func_start_time.pop();
         if(data.func_recursion_depth == 0){
             var loc = data.func_loc.pop();
             data.func_loc_name_time_assoc[loc][1] += time -data.func_start_time.pop();
+            data.func_loc_name_time_assoc[loc][10] += mem -data.func_start_mem.pop();
         }
         else data.func_recursion_depth--;
-        //data.functions += "----" + data.func_loc_name_time_assoc[loc][1] + "----\n";
-        //data.functions += "         Function " + data.func_loc_name_time_assoc[loc][0] + data.func_loc_name_time_assoc[loc][1] + "\n";
-//                            data.func_name.pop() + 
- //                         "(" + data.func_args.pop() + ")" + 
-   //                       "\" in file " + data.func_loc.pop() +
-     //                     "............" + (time - data.func_start_time.pop()) + "ms\n";
         prof_enable();
     }
 }
-/*
-function prof_recordFuncCall(args, funcName){
-    "tachyon:static";
-    "tachyon:noglobal";
-    
-    var ctx = iir.get_ctx();
-    var enabled = get_ctx_profenable(ctx);
-    if (enabled) {
-        prof_disable();
-        var data = get_ctx_profdata(ctx);
-        data.func_calls++;
-        data.functions += "         " + funcName + "(" + args + ")\n";
-        prof_enable();
-    }
-}
-*/
 function prof_recordPropGet(propName){
     "tachyon:static";
     "tachyon:noglobal";
@@ -3209,7 +3415,10 @@ function prof_recordPropGet(propName){
         prof_disable();
         var data = get_ctx_profdata(ctx);
         data.prop_gets++;
-        data.accessed_properties += "         " + propName + "\n";
+        if(data.accessed_properties.hasOwnProperty(propName))
+            data.accessed_properties[propName]++;
+        else
+            data.accessed_properties[propName] = 1;
         prof_enable();
     }
 }
@@ -3224,12 +3433,15 @@ function prof_recordPropPut(propName){
         prof_disable();
         var data = get_ctx_profdata(ctx);
         data.prop_puts++;
-        data.modified_properties += "         " + propName + "\n";
+        if(data.modified_properties.hasOwnProperty(propName))
+            data.modified_properties[propName]++;
+        else
+            data.modified_properties[propName] = 1;
         prof_enable();
     }
 }
 
-function prof_recordFuncCallsPerDepth(func_calls_per_depth){
+function prof_recordFuncCallsPerDepth(static_func_calls_per_depth){
     "tachyon:static";
     "tachyon:noglobal";
     
@@ -3238,21 +3450,7 @@ function prof_recordFuncCallsPerDepth(func_calls_per_depth){
     if (enabled) {
         prof_disable();
         var data = get_ctx_profdata(ctx);
-        data.func_calls_per_depth = func_calls_per_depth;
-        prof_enable();
-    }
-}
-
-function prof_test() {
-    "tachyon:static";
-    "tachyon:noglobal";
-    
-    var ctx = iir.get_ctx();
-    var enabled = get_ctx_profenable(ctx);
-    if (enabled) {
-        prof_disable();
-        var data = get_ctx_profdata(ctx);
-        data.test++;
+        data.static_func_calls_per_depth = static_func_calls_per_depth;
         prof_enable();
     }
 }
@@ -3265,21 +3463,151 @@ function prof_getData(){
     return get_ctx_profdata(ctx);
 }
 
+function prof_recordDynamicFuncCall(depth, func_call_return_value){
+    "tachyon:static";
+    "tachyon:noglobal";
+    
+    var ctx = iir.get_ctx();
+    var enabled = get_ctx_profenable(ctx);
+    if (enabled) {
+        prof_disable();
+        var data = get_ctx_profdata(ctx);
+        if(depth < 6) data.dynamic_func_calls_per_depth[depth]++;
+        else data.dynamic_func_calls_per_depth[6]++;
+        prof_enable();
+    }
+
+    return func_call_return_value;
+}
+
+function prof_recordStdLibCall(propName, objType){
+    "tachyon:static";
+    "tachyon:noglobal";
+    
+    var ctx = iir.get_ctx();
+    var enabled = get_ctx_profenable(ctx);
+    if (enabled) {
+        prof_disable();
+        var data = get_ctx_profdata(ctx);
+
+        if(propName == "Object"){
+            data.std_lib_Object_called = true;
+        }
+
+        if(data.std_lib_Object_called && data.std_lib_object_functions.hasOwnProperty(propName)){
+            data.std_lib_object_functions[propName]++;
+            data.std_lib_object_was_called = true;
+            data.std_lib_Object_called = false;
+        }
+
+        if(objType == 1 && data.std_lib_object_functions.hasOwnProperty(propName)){
+            data.std_lib_object_functions[propName]++;
+            data.std_lib_object_was_called = true;
+        }
+
+
+        else if(objType == 2 && data.std_lib_array_functions.hasOwnProperty(propName)){
+            data.std_lib_array_functions[propName]++;
+            data.std_lib_array_was_called = true;
+        }
+
+        else if(objType == 3 && data.std_lib_string_functions.hasOwnProperty(propName)){
+            data.std_lib_string_functions[propName]++;
+            data.std_lib_string_was_called = true;
+        }
+
+        else if(objType == 4 && data.std_lib_function_functions.hasOwnProperty(propName)){
+            data.std_lib_function_functions[propName]++;
+            data.std_lib_function_was_called = true;
+        }
+
+        else if(data.std_lib_math_functions.hasOwnProperty(propName)){
+            data.std_lib_math_functions[propName]++;
+            data.std_lib_math_was_called = true;
+        }
+        
+        else if(propName == "print")
+            data.std_lib_print_calls++;
+
+        prof_enable();
+    }
+}
+
+function prof_test(text) {
+    "tachyon:static";
+    "tachyon:noglobal";
+    
+    var ctx = iir.get_ctx();
+    var enabled = get_ctx_profenable(ctx);
+    if (enabled) {
+        prof_disable();
+        var data = get_ctx_profdata(ctx);
+        data.test++;
+        data.text_test += text + "  ";
+        prof_enable();
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 /*
-Reports
+Profiling reports
 */
 
-function prof_allocReport(){
+function lightProf_report(){
     "tachyon:static";
     
     prof_disable();
 
     var data = prof_getData();
 
+    data.total_mem_alloc_KBs = memAllocatedKBs() - data.start_mem_alloc_KBs;
+
+    prof_allocReport(data);
+    prof_propGetReport(data);
+    prof_propPutReport(data);
+    prof_stdLibReport(data);
+    prof_fileReport4Light(data);
+    prof_testReport(data);
+}
+
+function heavyProf_report(){
+    "tachyon:static";
+    
+    prof_disable();
+
+    var data = prof_getData();
+
+    data.total_mem_alloc_KBs = memAllocatedKBs() - data.start_mem_alloc_KBs;
+
+    prof_allocReport(data);
+    prof_propGetReport(data);
+    prof_propPutReport(data);
+    prof_stdLibReport(data);
+    prof_funcCallReport(data);
+    prof_funcCallsPerDepthReport(data);
+    prof_fileReport4Heavy(data);
+    prof_testReport(data);
+}
+
+function prof_allocReport(data){
+    "tachyon:static";
+
     data.alloc_report += 
         "\n------- PROFILING: ALLOCATION REPORT -------\n\n" +
         "      IRType.box allocs: " + data.box_allocs + " (" + 100*data.box_allocs/data.allocs + "%)\n" +
-        "         tag_immediate_int allocs: " + data.tag_immediate_int + " (" + 100*data.tag_immediate_int/data.allocs + "%)\n" +
         "         tag_object allocs: " + data.tag_object + " (" + 100*data.tag_object/data.allocs + "%)\n" +
         "         tag_function allocs: " + data.tag_function + " (" + 100*data.tag_function/data.allocs + "%)\n" +
         "         tag_array allocs: " + data.tag_array + " (" + 100*data.tag_array/data.allocs + "%)\n" +
@@ -3288,115 +3616,426 @@ function prof_allocReport(){
         "         tag_other allocs: " + data.tag_other + " (" + 100*data.tag_other/data.allocs + "%)\n" +
         "\n      IRType.ref allocs: " + data.ref_allocs + " (" + 100*data.ref_allocs/data.allocs + "%)\n\n" +
         "   ->Total allocs: " + data.allocs + "\n" +
+        "   ->Total memory allocated: " + data.total_mem_alloc_KBs + " KBs\n" +
+       // "   LAYOUT ORDER: \n" + data.alloc_order + "\n" +
         "\n";
     print(data.alloc_report);
 }
 
 
-function prof_propGetReport(){
+function prof_propGetReport(data){
     "tachyon:static";
     
-    prof_disable();
-
-    var data = prof_getData();
-    
     data.prop_get_report +=
-        "\n------- PROFILING: PROPERTIE ACCESSES (GET) REPORT -------\n\n" +
-        "      List of accessed properties:\n" +
-        data.accessed_properties + "\n" +
-        "   ->Total propertie accesses: " + data.prop_gets + "\n" +
+        "\n------- PROFILING: PROPERTY ACCESSES (GET) REPORT -------\n\n" +
+        "      List of accessed properties:\n";
+
+    for(var i in data.accessed_properties){
+        var nb_accesses = data.accessed_properties[i];
+        data.prop_get_report += "            " +
+            i +  
+            " (" + 
+            nb_accesses;  
+            if(nb_accesses != 1) data.prop_get_report += " accesses)\n";
+            else data.prop_get_report += " access)\n";
+    }
+
+    data.prop_get_report += 
+        "\n   ->Total property accesses: " + data.prop_gets + "\n" +
         "\n";
     print(data.prop_get_report);
 }
 
-function prof_propPutReport(){
+function prof_propPutReport(data){
     "tachyon:static";
     
-    prof_disable();
-
-    var data = prof_getData();
-    
     data.prop_put_report +=
-        "\n------- PROFILING: PROPERTIE MODIFICATIONS (PUT) REPORT -------\n\n" +
-        "      List of modified properties:\n" +
-        data.modified_properties + "\n" +
-        "   ->Total propertie modifications: " + data.prop_puts + "\n" +
+        "\n------- PROFILING: PROPERTY MODIFICATIONS (PUT) REPORT -------\n\n" +
+        "      List of modified properties:\n";
+
+    for(var i in data.modified_properties){
+        var nb_modifications = data.modified_properties[i];
+        data.prop_put_report += "            " +
+            i +  
+            " (" + 
+             nb_modifications; 
+            if(nb_modifications != 1) data.prop_put_report += " modifications)\n";
+            else data.prop_put_report += " modification)\n";
+    }
+
+    data.prop_put_report += 
+        "\n   ->Total property modifications: " + data.prop_puts + "\n" +
         "\n";
     print(data.prop_put_report);
 }
 
-function prof_funcCallReport(){
+function prof_funcCallReport(data){
     "tachyon:static";
-    
-    prof_disable();
 
-    var data = prof_getData();
     var loc;
     for (var i in data.func_loc_name_time_assoc){
         loc = i.toString();
-        funcName = data.func_loc_name_time_assoc[loc][0];
+        var funcName = data.func_loc_name_time_assoc[loc][0];
+        var total_allocs = data.func_loc_name_time_assoc[loc][9];
+        var mem_in_KBs = data.func_loc_name_time_assoc[loc][10];
         if(funcName == undefined)
-            data.functions += "            Undefined function" +
-                              " in file " +
+            data.functions += "            " + 
+                              data.func_loc_name_time_assoc[loc][2] +
+                              " call(s) to undefined function in file " +
                               loc +
                               "..............." +
                               data.func_loc_name_time_assoc[loc][1] +
-                              "ms\n"; 
+                              "ms\n" +
+                              "                    tag_object allocs: " + data.func_loc_name_time_assoc[loc][3] +
+//                              " (" + 100*data.func_loc_name_time_assoc[loc][3]/total_allocs + "%)" + 
+                              "\n" +
+                              "                    tag_function allocs: " + data.func_loc_name_time_assoc[loc][4] + 
+//                              " (" + 100*data.func_loc_name_time_assoc[loc][4]/total_allocs + "%)" + 
+                              "\n" +
+                              "                    tag_array allocs: " + data.func_loc_name_time_assoc[loc][5] + 
+//                              " (" + 100*data.func_loc_name_time_assoc[loc][5]/total_allocs + "%)" + 
+                              "\n" +
+                              "                    tag_float allocs: " + data.func_loc_name_time_assoc[loc][6] + 
+//                              " (" + 100*data.func_loc_name_time_assoc[loc][6]/total_allocs + "%)" + 
+                              "\n" +
+                              "                    tag_string allocs: " + data.func_loc_name_time_assoc[loc][7] + 
+//                              " (" + 100*data.func_loc_name_time_assoc[loc][7]/total_allocs + "%)" + 
+                              "\n" +
+                              "                    tag_other allocs: " + data.func_loc_name_time_assoc[loc][8] + 
+//                              " (" + 100*data.func_loc_name_time_assoc[loc][8]/total_allocs + "%)" + 
+                              "\n" +
+                              "                  ->Total allocs: " + total_allocs + 
+                              " (" + 100*total_allocs/data.allocs + "%)" + 
+                              "\n" +
+                              "                  ->Memory allocated: " + mem_in_KBs + " KBs" +   
+                              " (" + 100*mem_in_KBs/data.total_mem_alloc_KBs + "%)\n" + 
+                              "\n"; 
         else
-            data.functions += "            Function \"" + 
+            data.functions += "            " + 
+                              data.func_loc_name_time_assoc[loc][2] +
+                              " call(s) to function \"" + 
                               data.func_loc_name_time_assoc[loc][0] + 
                               "\" in file " +
                               loc +
                               "..............." +
                               data.func_loc_name_time_assoc[loc][1] +
-                              "ms\n"; 
+                              "ms\n" + 
+                              "                    tag_object allocs: " + data.func_loc_name_time_assoc[loc][3] + 
+//                              " (" + 100*data.func_loc_name_time_assoc[loc][3]/total_allocs + "%)" + 
+                              "\n" +
+                              "                    tag_function allocs: " + data.func_loc_name_time_assoc[loc][4] + 
+//                              " (" + 100*data.func_loc_name_time_assoc[loc][4]/total_allocs + "%)" + 
+                              "\n" +
+                              "                    tag_array allocs: " + data.func_loc_name_time_assoc[loc][5] + 
+//                              " (" + 100*data.func_loc_name_time_assoc[loc][5]/total_allocs + "%)" + 
+                              "\n" +
+                              "                    tag_float allocs: " + data.func_loc_name_time_assoc[loc][6] + 
+//                              " (" + 100*data.func_loc_name_time_assoc[loc][6]/total_allocs + "%)" + 
+                              "\n" +
+                              "                    tag_string allocs: " + data.func_loc_name_time_assoc[loc][7] + 
+//                              " (" + 100*data.func_loc_name_time_assoc[loc][7]/total_allocs + "%)" + 
+                              "\n" +
+                              "                    tag_other allocs: " + data.func_loc_name_time_assoc[loc][8] + 
+//                              " (" + 100*data.func_loc_name_time_assoc[loc][8]/total_allocs + "%)" + 
+                              "\n" +                              
+                              "                  ->Total allocs: " + total_allocs + 
+                              " (" + 100*total_allocs/data.allocs + "%)" + 
+                              "\n" +
+                              "                  ->Memory allocated: " + mem_in_KBs + " KBs" + 
+                              " (" + 100*mem_in_KBs/data.total_mem_alloc_KBs + "%)\n" + 
+                              "\n"; 
     }
     
     data.func_call_report +=
-        "\n------- PROFILING: FUNCTION CALLS REPORT (USER FUNCTIONS) -------\n\n" +
-        "      List of functions called and time spent in each:\n" +
+        "\n------- PROFILING: FUNCTION CALLS REPORT (USER DEFINED FUNCTIONS) -------\n\n" +
+        "      List of functions called, time spent in each and local allocation report:\n\n" +
         data.functions + "\n" +
-        "   ->Total function calls: " + data.func_calls + "\n" +
+        "   ->Total user defined functions called: " + data.func_calls + "\n" +
         "\n"	
         //+ "Last Start Time: " + data.func_start_time + "	\n"
         ;
     print(data.func_call_report);
 }
 
-function prof_funcCallsPerDepthReport(){
+function prof_funcCallsPerDepthReport(data){
     "tachyon:static";
-    
-    prof_disable();
+    var func_calls_per_depth_report = "\n------- PROFILING: FUNCTION CALLS PER DEPTH OF INDIRECTION -------\n\n" + 
+        "(A function call of depth 0 corresponds to any call to a function that is not property of an object)\n\n" +    
+        "    Depth                                 Static calls                              Dynamic calls\n";
 
-    var data = prof_getData();
+    var static_func_calls_per_depth = data.static_func_calls_per_depth;
+    var dynamic_func_calls_per_depth = data.dynamic_func_calls_per_depth;
 
-    data.func_calls_per_depth_report += "\n------- PROFILING: FUNCTION CALLS PER DEPTH OF INDIRECTION -------\n\n" + 
-        "(Depth 0 is the global level)\n\n" +    
-        "    Depth      Number of calls\n";
+    for(var i in static_func_calls_per_depth) {
 
-    for(var i in data.func_calls_per_depth) {
-        if(i < 10) data.func_calls_per_depth_report += "      " + i + "..............." + data.func_calls_per_depth[i] + "\n";
-        else data.func_calls_per_depth_report += "      " + i + ".............." + data.func_calls_per_depth[i] + "\n";
+        var nb_of_static_calls = static_func_calls_per_depth[i] + "";
+        var nb_of_dynamic_calls = dynamic_func_calls_per_depth[i] + "";
+
+        var len_word_1 = nb_of_static_calls.length;
+        var len_word_2 = nb_of_dynamic_calls.length;
+
+        var even_1 = false;
+        var even_2 = false;
+
+        if(len_word_1 % 2 == 0) even_1 = true;
+        if(len_word_2 % 2 == 0) even_2 = true;
+
+        var first_half_1 = len_word_1 / 2;
+        var first_half_2 = len_word_2 / 2;
+
+        var dot_str_1a = "";
+        var dot_str_1b = "";
+        var dot_str_2 = "";
+
+        var nb_of_dots_1 = 40 - first_half_1;
+        var nb_of_dots_2 = 40 - first_half_1 - first_half_2;
+
+        for(var j = nb_of_dots_1; j > 0; j--){
+            dot_str_1a += ".";
+            if(j > 3) dot_str_1b += ".";
+        }
+
+        for(var k = 0; k < nb_of_dots_2; k++){
+            dot_str_2 += ".";
+        }
+
+        if(i != 6)
+            func_calls_per_depth_report += "      " + 
+                i + 
+                dot_str_1a + 
+                nb_of_static_calls +
+                dot_str_2 + 
+                nb_of_dynamic_calls +
+                "\n";
+        else 
+            func_calls_per_depth_report += 
+                "      " + 
+                i + 
+                "(+)" +
+                dot_str_1b + 
+                nb_of_static_calls +
+                dot_str_2 + 
+                nb_of_dynamic_calls +
+                "\n";
                                                                                
     }
+
+    data.func_calls_per_depth_report = func_calls_per_depth_report;
     print(data.func_calls_per_depth_report);
 }
 
-function prof_fileReport() {
+function prof_stdLibReport(data){
     "tachyon:static";
-    
-    var data = prof_getData();
+    var std_lib_functions_called_report = "";
+    var total_nb_calls = 0;
 
-    writeFile("./profiler/profiling_report.txt", data.alloc_report + data.prop_get_report + data.func_call_report);
+    var std_lib_array_functions = data.std_lib_array_functions;
+    var nb_calls;
+    var local_total = 0; 
+
+    if(data.std_lib_array_was_called){
+        for(var i in std_lib_array_functions){
+            nb_calls = std_lib_array_functions[i];
+            local_total += nb_calls;
+
+            if(nb_calls > 0) {
+                std_lib_functions_called_report += "        " +
+                    nb_calls +
+                    " call(s) to function \"" + 
+                    i +
+                    "\"\n";
+            }
+        }
+        std_lib_functions_called_report += "      ->" +
+            "Total call(s): " +
+            local_total +
+            "\n";
+        total_nb_calls += local_total;
+    }
+    else
+        std_lib_functions_called_report += "        " +
+            "--- no array standard library functions called ---" +
+            "\n";
+    
+    
+    //Math standard library functions called
+    std_lib_functions_called_report += "\n    MATH\n"
+
+    var std_lib_math_functions = data.std_lib_math_functions;
+    nb_calls;
+    local_total = 0; 
+
+    if(data.std_lib_math_was_called){
+        for(var i in std_lib_math_functions){
+            nb_calls = std_lib_math_functions[i];
+            local_total += nb_calls;
+ 
+            if(nb_calls > 0) {
+                std_lib_functions_called_report += "        " +
+                    nb_calls +
+                    " call(s) to function \"" + 
+                    i +
+                    "\"\n";
+            }
+        }
+        std_lib_functions_called_report += "      ->" +
+            "Total call(s): " +
+            local_total +
+            "\n";
+        total_nb_calls += local_total;
+    }    
+    else
+        std_lib_functions_called_report += "        " +
+            "--- no math standard library functions called ---" +
+            "\n";
+
+
+    //Object standard library functions called
+    std_lib_functions_called_report += "\n    OBJECT\n";
+
+    var std_lib_object_functions = data.std_lib_object_functions;
+    nb_calls;
+    local_total = 0; 
+    
+    if(data.std_lib_object_was_called){
+        for(var i in std_lib_object_functions){
+            nb_calls = std_lib_object_functions[i];
+            local_total += nb_calls;
+ 
+            if(nb_calls > 0) {
+                std_lib_functions_called_report += "        " +
+                    nb_calls +
+                    " call(s) to function \"";
+                if(i == "x_hasOwnProperty_x") 
+                    std_lib_functions_called_report += "hasOwnProperty";
+                else std_lib_functions_called_report += i;
+                std_lib_functions_called_report += "\"\n";
+            }
+        }
+        std_lib_functions_called_report += "      ->" +
+            "Total call(s): " +
+            local_total +
+            "\n";
+        total_nb_calls += local_total;
+    }    
+    else
+        std_lib_functions_called_report += "        " +
+            "--- no object standard library functions called ---" +
+            "\n";
+
+
+    //String standard library functions called
+    std_lib_functions_called_report += "\n    STRING\n";
+
+    var std_lib_string_functions = data.std_lib_string_functions;
+    nb_calls;
+    local_total = 0;
+
+    if(data.std_lib_string_was_called){
+        for(var i in std_lib_string_functions){
+            nb_calls = std_lib_string_functions[i];
+            local_total += nb_calls;
+ 
+            if(nb_calls > 0) {
+                std_lib_functions_called_report += "        " +
+                    nb_calls +
+                    " call(s) to function \"" +
+                    i +
+                    "\"\n";
+            }
+        }
+        std_lib_functions_called_report += "      ->" +
+            "Total call(s): " +
+            local_total +
+            "\n";
+        total_nb_calls += local_total;
+    }    
+    else
+        std_lib_functions_called_report += "        " +
+            "--- no string standard library functions called ---" +
+            "\n";
+
+    //Function standard library functions called
+    std_lib_functions_called_report += "\n    FUNCTION\n";
+
+    var std_lib_function_functions = data.std_lib_function_functions;
+    nb_calls;
+    local_total = 0; 
+
+    if(data.std_lib_function_was_called){
+        for(var i in std_lib_function_functions){
+            nb_calls = std_lib_function_functions[i];
+            local_total += nb_calls;
+ 
+            if(nb_calls > 0) {
+                std_lib_functions_called_report += "        " +
+                    nb_calls +
+                    " call(s) to function \"" +
+                    i +
+                    "\"\n";
+            }
+        }
+        std_lib_functions_called_report += "      ->" +
+            "Total call(s): " +
+            local_total +
+            "\n";
+        total_nb_calls += local_total;
+    }    
+    else
+        std_lib_functions_called_report += "        " +
+            "--- no function standard library functions called ---" +
+            "\n";
+    
+    //"print" standard library function called
+    std_lib_functions_called_report += "\n    PRINT\n" + 
+        "        " +
+        data.std_lib_print_calls +
+        " call(s)" +
+        "\n";
+
+    data.std_lib_functions_called_report =  "\n------- PROFILING: STANDARD LIBRARY FUNCTIONS CALLED -------\n\n" +
+    "    " +
+    "-> Total standard Library functions called: " +
+    total_nb_calls +
+    "\n\n" +
+    "    ARRAY" +
+    "\n" +
+    std_lib_functions_called_report;
+
+    print(data.std_lib_functions_called_report);
 }
 
-function prof_testReport() {
+function prof_fileReport4Light(data) {
     "tachyon:static";
-    
-    prof_disable();
 
-    var data = prof_getData();
+    writeFile("./profiler/profiling_report.txt", 
+        data.alloc_report +  "\n\n" +
+        data.prop_get_report +  "\n\n" +
+        data.prop_put_report +  "\n\n" +
+        data.std_lib_functions_called_report        
+    );
+}
+
+function prof_fileReport4Heavy(data) {
+    "tachyon:static";
+
+    writeFile("./profiler/profiling_report.txt", 
+        data.alloc_report + "\n" +
+        data.prop_get_report +  "\n\n" +
+        data.prop_put_report +  "\n\n" +
+        data.std_lib_functions_called_report + "\n\n" +
+        data.func_call_report + "\n\n" +
+        data.func_calls_per_depth_report
+    );
+}
+
+function prof_testReport(data) {
+    "tachyon:static";
 
     print("\n------- PROFILING: TEST REPORT -------\n");
     print("    Test: " + data.test + "\n\n");
+    print("    Text test: " + data.text_test + "\n\n");
 }
+
+
+

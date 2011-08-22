@@ -119,12 +119,12 @@ function main()
         config.hostParams.printASM = args.options["asm"];
 
         // Profiling: configuration
-        if (args.options['eventrec']) {
+        if (args.options['heavy_profiler']) {
 
             // The "files" parameter used to identify the user files
             config.hostParams.files = args.files;
 
-            config.hostParams.eventrec = true;
+            config.hostParams.heavy_profiler = true;
         }
 
         if (args.options['e'])
@@ -147,10 +147,6 @@ function main()
                 print("Executing " + args.files[i]);
             }
 
-            //Initiation of the event recording profiler
-            if (args.options['eventrec']) 
-                initProfiler(config.hostParams);
-
             if(args.options["compiletime"])
                 config.hostParams.compiletime = true;
 
@@ -167,7 +163,19 @@ function main()
                 new CIntAsBox()
             );
 
+            //Initiation of the event recording profiler
+            if (args.options['light_profiler'] || args.options['heavy_profiler']) 
+                initProfiler(config.hostParams);
+
             bridge(config.hostParams.ctxPtr);
+
+            //Producing event recording profiling report
+            if (args.options['light_profiler'])
+                lightProfReport(config.hostParams);
+
+            //Producing event recording profiling report
+            if (args.options['heavy_profiler'])
+                heavyProfReport(config.hostParams);
 
             var endTimeMs = (new Date()).getTime();
             var compTimeMs = midTimeMs - startTimeMs;
@@ -191,8 +199,6 @@ function main()
         tachyonRepl();
     }
 
-    if (args.options['eventrec'])
-            profilerReport(config.hostParams);
 }
 
 /**
@@ -216,6 +222,8 @@ function tachyonRepl()
         print('  /prim_list                     view a list of the primitive functions');
         print('  /prim_ir <func_name>           view LIR produced for a primitive function');
         print('  /cfg <command> [func_name]     visualize the CFG for a command/file/function');
+        print('  /light_profiler <command>      light profiling of user code');
+        print('  /heavy_profiler <command>      heavy profiling of user code');
         print('  /help                          print a help listing');
         print('  /exit                          exit the read-eval-print loop');
     }
