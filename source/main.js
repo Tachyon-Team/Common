@@ -117,10 +117,11 @@ function main()
         config.hostParams.printHIR = args.options["hir"];
         config.hostParams.printLIR = args.options["lir"];
         config.hostParams.printASM = args.options["asm"];
-
+        
         // Profiling: configuration
+        var heavy_prof = false;
         if (args.options['heavy_profiler']) {
-
+            heavy_prof = true;
             // The "files" parameter used to identify the user files
             config.hostParams.files = args.files;
 
@@ -163,18 +164,19 @@ function main()
                 new CIntAsBox()
             );
 
-            //Initiation of the event recording profiler
-            if (args.options['light_profiler'] || args.options['heavy_profiler']) 
+            //Profiling: Initiation of the event recording profiler
+            var light_prof = args.options['light_profiler'];
+            if (light_prof || heavy_prof) 
                 initProfiler(config.hostParams);
 
             bridge(config.hostParams.ctxPtr);
 
-            //Producing event recording profiling report
-            if (args.options['light_profiler'])
+            //Profiling: Producing light profiling report
+            if (light_prof)
                 lightProfReport(config.hostParams);
 
-            //Producing event recording profiling report
-            if (args.options['heavy_profiler'])
+            //Profiling: Producing heavy profiling report
+            if (heavy_prof)
                 heavyProfReport(config.hostParams);
 
             var endTimeMs = (new Date()).getTime();

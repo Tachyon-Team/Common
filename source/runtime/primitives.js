@@ -1721,7 +1721,7 @@ function putPropObj(obj, propName, propHash, propVal)
             // Set the corresponding property value
             set_hashtbl_tbl_val(tblPtr, hashIndex, propVal);
 
-            //Profiling: recording the modification of a property
+            //Profiling: recording the modification of a property (not associated with the global object)
             if(obj !== globalObj) prof_recordPropPut(propName);
 
             // Break out of the loop
@@ -3032,11 +3032,30 @@ function instanceOf(obj, ctor)
     return false;
 }
 
+
+
+
+
+
+
+
+
+
+
+
 //=============================================================================
 //
 // Profiling functions
 //
 //=============================================================================
+
+
+
+
+/*
+Profiling init and general functions
+*/
+
 
 function prof_init(){
     "tachyon:static";
@@ -3106,9 +3125,9 @@ function prof_init(){
         "alloc_report": "",
         "prop_get_report": "",
         "prop_put_report": "",
+        "std_lib_functions_called_report": "",
         "func_call_report": "",
-        "func_calls_per_depth_report": "",
-        "std_lib_functions_called_report": ""
+        "func_calls_per_depth_report": ""
     };
     var ctx = iir.get_ctx();
     set_ctx_profdata(ctx, prof);
@@ -3237,6 +3256,29 @@ function prof_disable() {
     var ctx = iir.get_ctx();
     set_ctx_profenable(ctx, false);
 }
+
+function prof_getData(){
+    "tachyon:static";
+    "tachyon:noglobal";
+
+    var ctx = iir.get_ctx();
+    return get_ctx_profdata(ctx);
+}
+
+
+
+
+
+
+
+
+
+
+
+/*
+Profiling recording functions
+*/
+
 
 function prof_recordAlloc(){
     "tachyon:static";
@@ -3455,14 +3497,6 @@ function prof_recordFuncCallsPerDepth(static_func_calls_per_depth){
     }
 }
 
-function prof_getData(){
-    "tachyon:static";
-    "tachyon:noglobal";
-
-    var ctx = iir.get_ctx();
-    return get_ctx_profdata(ctx);
-}
-
 function prof_recordDynamicFuncCall(depth, func_call_return_value){
     "tachyon:static";
     "tachyon:noglobal";
@@ -3580,7 +3614,7 @@ function lightProf_report(){
     prof_propPutReport(data);
     prof_stdLibReport(data);
     prof_fileReport4Light(data);
-    prof_testReport(data);
+    //prof_testReport(data);
 }
 
 function heavyProf_report(){
@@ -3599,7 +3633,31 @@ function heavyProf_report(){
     prof_funcCallReport(data);
     prof_funcCallsPerDepthReport(data);
     prof_fileReport4Heavy(data);
-    prof_testReport(data);
+    //prof_testReport(data);
+}
+
+function prof_fileReport4Light(data) {
+    "tachyon:static";
+
+    writeFile("./profiler/profiling_report.txt", 
+        data.alloc_report +  "\n\n" +
+        data.prop_get_report +  "\n\n" +
+        data.prop_put_report +  "\n\n" +
+        data.std_lib_functions_called_report        
+    );
+}
+
+function prof_fileReport4Heavy(data) {
+    "tachyon:static";
+
+    writeFile("./profiler/profiling_report.txt", 
+        data.alloc_report + "\n" +
+        data.prop_get_report +  "\n\n" +
+        data.prop_put_report +  "\n\n" +
+        data.std_lib_functions_called_report + "\n\n" +
+        data.func_call_report + "\n\n" +
+        data.func_calls_per_depth_report
+    );
 }
 
 function prof_allocReport(data){
@@ -4003,30 +4061,6 @@ function prof_stdLibReport(data){
     std_lib_functions_called_report;
 
     print(data.std_lib_functions_called_report);
-}
-
-function prof_fileReport4Light(data) {
-    "tachyon:static";
-
-    writeFile("./profiler/profiling_report.txt", 
-        data.alloc_report +  "\n\n" +
-        data.prop_get_report +  "\n\n" +
-        data.prop_put_report +  "\n\n" +
-        data.std_lib_functions_called_report        
-    );
-}
-
-function prof_fileReport4Heavy(data) {
-    "tachyon:static";
-
-    writeFile("./profiler/profiling_report.txt", 
-        data.alloc_report + "\n" +
-        data.prop_get_report +  "\n\n" +
-        data.prop_put_report +  "\n\n" +
-        data.std_lib_functions_called_report + "\n\n" +
-        data.func_call_report + "\n\n" +
-        data.func_calls_per_depth_report
-    );
 }
 
 function prof_testReport(data) {

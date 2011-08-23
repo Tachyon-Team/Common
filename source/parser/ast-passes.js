@@ -315,7 +315,6 @@ function ast_pass0_ctx(userFiles)
 {
     this.userFiles = userFiles;    //Files corresponding to the user program
     this.funcDeclId = undefined;   //The id of the function declaration encapsulating the function expression intrumentalized
-    this.args = [];
     this.inCallExpr = false;       //True during parsing of a function call
     this.inFuncDecl = false;       //True during parsing of a function declaration
     this.inFuncExpr = false;       //True during parsing of a function expression
@@ -439,8 +438,7 @@ ast_pass0_ctx.prototype.walk_statement = function (ast)
                             [new CallExpr(ast.loc, 
                                  new Ref(ast.loc, new Token(IDENT_CAT, "currentTimeMillis", ast.loc)), []),
                              new CallExpr(ast.loc, 
-                                 new Ref(ast.loc, new Token(IDENT_CAT, "memAllocatedKBs", ast.loc)), []),
-                             //new Ref(ast.loc, new Token(IDENT_CAT, this.args.pop(), ast.loc))
+                                 new Ref(ast.loc, new Token(IDENT_CAT, "memAllocatedKBs", ast.loc)), [])
                             ]
                         )), 
                      new ReturnStatement(ast.loc,
@@ -562,9 +560,9 @@ ast_pass0_ctx.prototype.walk_expr = function (ast)
     {
         if(this.filter_prof(ast)){
         
-            //If not in a function declration and not in a function expression 
+            //If not in a function declaration and not in a function expression 
             //                => call occurs on global level and must be profiled
-            if(!this.inFuncDecl && !this.inFuncExpr) {//TODO: use scope property to determine if call is global
+            if(!this.inFuncDecl && !this.inFuncExpr) {
 
                 //In Call Expression => enable tracking of depth of function call
                 if(ast.fn instanceof OpExpr){
@@ -583,6 +581,7 @@ ast_pass0_ctx.prototype.walk_expr = function (ast)
                         this.calls_per_depth[measured_depth] += 1;
                     else this.calls_per_depth[6] += 1;
 
+                    //Transform "CallExpr" into "prof_recordDynamicFuncCall(level, CallExpr)" which returns "CallExpr"
                     ast = new CallExpr(ast.loc,
                             new Ref(ast.loc, 
                                 new Token(IDENT_CAT, "prof_recordDynamicFuncCall", ast.loc)),
@@ -590,13 +589,13 @@ ast_pass0_ctx.prototype.walk_expr = function (ast)
                         );   
                 }
 
-                //No indirection => direct call to a global function
-                //TODO: distinguish stdlib calls?
+                //No indirection => direct call to a global function (depth of indirection is 0)
                 else{
                     ast.fn = this.walk_expr(ast.fn);
                     ast.args = ast_walk_exprs(ast.args, this);
                     this.calls_per_depth[0] += 1;
 
+                    //Transform "CallExpr" into "prof_recordDynamicFuncCall(level, CallExpr)" which returns "CallExpr"
                     ast = new CallExpr(ast.loc,
                             new Ref(ast.loc, 
                                 new Token(IDENT_CAT, "prof_recordDynamicFuncCall", ast.loc)),
