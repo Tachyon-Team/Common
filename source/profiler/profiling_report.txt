@@ -1,0 +1,95 @@
+
+------- PROFILING: ALLOCATION REPORT -------
+
+      IRType.box allocs: 162 (100%)
+         tag_object allocs: 11 (6%)
+         tag_function allocs: 0 (0%)
+         tag_array allocs: 41 (25%)
+         tag_float allocs: 0 (0%)
+         tag_string allocs: 15 (9%)
+         tag_other allocs: 95 (58%)
+
+      IRType.ref allocs: 0 (0%)
+
+   ->Total allocs: 162
+   ->Total memory allocated: 13 KBs
+
+
+
+------- PROFILING: PROPERTY ACCESSES (GET) REPORT -------
+
+      List of accessed properties:
+            joinCharArray (16 accesses)
+            undefined (13 accesses)
+            prototype (16 accesses)
+            arr (8 accesses)
+            arr2 (1 access)
+
+   ->Total property accesses: 54
+
+
+
+
+------- PROFILING: PROPERTY MODIFICATIONS (PUT) REPORT -------
+
+      List of modified properties:
+
+   ->Total property modifications: 22
+
+
+
+
+------- PROFILING: STANDARD LIBRARY FUNCTIONS CALLED -------
+
+    -> Total standard Library functions called: 38
+
+    ARRAY
+        4 call(s) to function "join"
+        1 call(s) to function "concat"
+        4 call(s) to function "toString"
+        3 call(s) to function "push"
+      ->Total call(s): 12
+
+    MATH
+        --- no math standard library functions called ---
+
+    OBJECT
+        --- no object standard library functions called ---
+
+    STRING
+        4 call(s) to function "toString"
+        13 call(s) to function "charCodeAt"
+      ->Total call(s): 17
+
+    FUNCTION
+        6 call(s) to function "apply"
+        3 call(s) to function "call"
+      ->Total call(s): 9
+
+    PRINT
+        5 call(s)
+
+
+
+------- PROFILING: FUNCTION CALLS REPORT (USER DEFINED FUNCTIONS) -------
+
+      List of functions called, time spent in each and local allocation report:
+
+
+   ->Total user defined functions called: 0
+
+
+
+
+------- PROFILING: FUNCTION CALLS PER DEPTH OF INDIRECTION -------
+
+(A function call of depth 0 corresponds to any call to a function that is not property of an object)
+
+    Depth                                 Static calls                              Dynamic calls
+      0........................................5........................................5
+      1........................................1........................................1
+      2........................................0........................................0
+      3........................................0........................................0
+      4........................................0........................................0
+      5........................................0........................................0
+      6(+).....................................0........................................0
