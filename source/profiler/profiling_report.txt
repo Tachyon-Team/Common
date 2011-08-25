@@ -1,31 +1,23 @@
 
 ------- PROFILING: ALLOCATION REPORT -------
 
-      IRType.box allocs: 162 (100%)
-         tag_object allocs: 11 (6%)
-         tag_function allocs: 0 (0%)
-         tag_array allocs: 41 (25%)
-         tag_float allocs: 0 (0%)
-         tag_string allocs: 15 (9%)
-         tag_other allocs: 95 (58%)
+     object allocs: 2 (10%)
+     function allocs: 2 (10%)
+     array allocs: 4 (20%)
+     float allocs: 0 (0%)
+     string allocs: 1 (5%)
+     other allocs: 11 (55%)
 
-      IRType.ref allocs: 0 (0%)
-
-   ->Total allocs: 162
-   ->Total memory allocated: 13 KBs
+   ->Total allocs: 20
+   ->Total memory allocated: 7 KBs
 
 
 
 ------- PROFILING: PROPERTY ACCESSES (GET) REPORT -------
 
       List of accessed properties:
-            joinCharArray (16 accesses)
-            undefined (13 accesses)
-            prototype (16 accesses)
-            arr (8 accesses)
-            arr2 (1 access)
 
-   ->Total property accesses: 54
+   ->Total property accesses: 0
 
 
 
@@ -33,22 +25,19 @@
 ------- PROFILING: PROPERTY MODIFICATIONS (PUT) REPORT -------
 
       List of modified properties:
+            prototype (2 modifications)
 
-   ->Total property modifications: 22
+   ->Total property modifications: 5
 
 
 
 
 ------- PROFILING: STANDARD LIBRARY FUNCTIONS CALLED -------
 
-    -> Total standard Library functions called: 38
+    -> Total standard Library functions called: 0
 
     ARRAY
-        4 call(s) to function "join"
-        1 call(s) to function "concat"
-        4 call(s) to function "toString"
-        3 call(s) to function "push"
-      ->Total call(s): 12
+        --- no array standard library functions called ---
 
     MATH
         --- no math standard library functions called ---
@@ -57,17 +46,13 @@
         --- no object standard library functions called ---
 
     STRING
-        4 call(s) to function "toString"
-        13 call(s) to function "charCodeAt"
-      ->Total call(s): 17
+        --- no string standard library functions called ---
 
     FUNCTION
-        6 call(s) to function "apply"
-        3 call(s) to function "call"
-      ->Total call(s): 9
+        --- no function standard library functions called ---
 
     PRINT
-        5 call(s)
+        2 call(s)
 
 
 
@@ -75,8 +60,28 @@
 
       List of functions called, time spent in each and local allocation report:
 
+            1 call(s) to function "do_print" in file "profiler/tests/call_expr_as_arg.js"@43.1-45.2...............1ms
+                    object allocs: 0
+                    function allocs: 0
+                    array allocs: 0
+                    float allocs: 0
+                    string allocs: 0
+                    other allocs: 0
+                  ->Total allocs: 0 (0%)
+                  ->Memory allocated: 1 KBs (14%)
 
-   ->Total user defined functions called: 0
+            1 call(s) to function "to_call" in file "profiler/tests/call_expr_as_arg.js"@47.1-49.2...............0ms
+                    object allocs: 0
+                    function allocs: 0
+                    array allocs: 0
+                    float allocs: 0
+                    string allocs: 0
+                    other allocs: 0
+                  ->Total allocs: 0 (0%)
+                  ->Memory allocated: 0 KBs (0%)
+
+
+   ->Total user defined functions called: 2
 
 
 
@@ -86,8 +91,8 @@
 (A function call of depth 0 corresponds to any call to a function that is not property of an object)
 
     Depth                                 Static calls                              Dynamic calls
-      0........................................5........................................5
-      1........................................1........................................1
+      0........................................2........................................2
+      1........................................0........................................0
       2........................................0........................................0
       3........................................0........................................0
       4........................................0........................................0

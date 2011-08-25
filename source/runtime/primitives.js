@@ -3665,17 +3665,14 @@ function prof_allocReport(data){
 
     data.alloc_report += 
         "\n------- PROFILING: ALLOCATION REPORT -------\n\n" +
-        "      IRType.box allocs: " + data.box_allocs + " (" + 100*data.box_allocs/data.allocs + "%)\n" +
-        "         tag_object allocs: " + data.tag_object + " (" + 100*data.tag_object/data.allocs + "%)\n" +
-        "         tag_function allocs: " + data.tag_function + " (" + 100*data.tag_function/data.allocs + "%)\n" +
-        "         tag_array allocs: " + data.tag_array + " (" + 100*data.tag_array/data.allocs + "%)\n" +
-        "         tag_float allocs: " + data.tag_float + " (" + 100*data.tag_float/data.allocs + "%)\n" +
-        "         tag_string allocs: " + data.tag_string + " (" + 100*data.tag_string/data.allocs + "%)\n" +
-        "         tag_other allocs: " + data.tag_other + " (" + 100*data.tag_other/data.allocs + "%)\n" +
-        "\n      IRType.ref allocs: " + data.ref_allocs + " (" + 100*data.ref_allocs/data.allocs + "%)\n\n" +
+        "     object allocs: " + data.tag_object + " (" + 100*data.tag_object/data.allocs + "%)\n" +
+        "     function allocs: " + data.tag_function + " (" + 100*data.tag_function/data.allocs + "%)\n" +
+        "     array allocs: " + data.tag_array + " (" + 100*data.tag_array/data.allocs + "%)\n" +
+        "     float allocs: " + data.tag_float + " (" + 100*data.tag_float/data.allocs + "%)\n" +
+        "     string allocs: " + data.tag_string + " (" + 100*data.tag_string/data.allocs + "%)\n" +
+        "     other allocs: " + data.tag_other + " (" + 100*data.tag_other/data.allocs + "%)\n\n" +
         "   ->Total allocs: " + data.allocs + "\n" +
         "   ->Total memory allocated: " + data.total_mem_alloc_KBs + " KBs\n" +
-       // "   LAYOUT ORDER: \n" + data.alloc_order + "\n" +
         "\n";
     print(data.alloc_report);
 }
@@ -3744,22 +3741,22 @@ function prof_funcCallReport(data){
                               "..............." +
                               data.func_loc_name_time_assoc[loc][1] +
                               "ms\n" +
-                              "                    tag_object allocs: " + data.func_loc_name_time_assoc[loc][3] +
+                              "                    object allocs: " + data.func_loc_name_time_assoc[loc][3] +
 //                              " (" + 100*data.func_loc_name_time_assoc[loc][3]/total_allocs + "%)" + 
                               "\n" +
-                              "                    tag_function allocs: " + data.func_loc_name_time_assoc[loc][4] + 
+                              "                    function allocs: " + data.func_loc_name_time_assoc[loc][4] + 
 //                              " (" + 100*data.func_loc_name_time_assoc[loc][4]/total_allocs + "%)" + 
                               "\n" +
-                              "                    tag_array allocs: " + data.func_loc_name_time_assoc[loc][5] + 
+                              "                    array allocs: " + data.func_loc_name_time_assoc[loc][5] + 
 //                              " (" + 100*data.func_loc_name_time_assoc[loc][5]/total_allocs + "%)" + 
                               "\n" +
-                              "                    tag_float allocs: " + data.func_loc_name_time_assoc[loc][6] + 
+                              "                    float allocs: " + data.func_loc_name_time_assoc[loc][6] + 
 //                              " (" + 100*data.func_loc_name_time_assoc[loc][6]/total_allocs + "%)" + 
                               "\n" +
-                              "                    tag_string allocs: " + data.func_loc_name_time_assoc[loc][7] + 
+                              "                    string allocs: " + data.func_loc_name_time_assoc[loc][7] + 
 //                              " (" + 100*data.func_loc_name_time_assoc[loc][7]/total_allocs + "%)" + 
                               "\n" +
-                              "                    tag_other allocs: " + data.func_loc_name_time_assoc[loc][8] + 
+                              "                    other allocs: " + data.func_loc_name_time_assoc[loc][8] + 
 //                              " (" + 100*data.func_loc_name_time_assoc[loc][8]/total_allocs + "%)" + 
                               "\n" +
                               "                  ->Total allocs: " + total_allocs + 
@@ -3778,22 +3775,22 @@ function prof_funcCallReport(data){
                               "..............." +
                               data.func_loc_name_time_assoc[loc][1] +
                               "ms\n" + 
-                              "                    tag_object allocs: " + data.func_loc_name_time_assoc[loc][3] + 
+                              "                    object allocs: " + data.func_loc_name_time_assoc[loc][3] + 
 //                              " (" + 100*data.func_loc_name_time_assoc[loc][3]/total_allocs + "%)" + 
                               "\n" +
-                              "                    tag_function allocs: " + data.func_loc_name_time_assoc[loc][4] + 
+                              "                    function allocs: " + data.func_loc_name_time_assoc[loc][4] + 
 //                              " (" + 100*data.func_loc_name_time_assoc[loc][4]/total_allocs + "%)" + 
                               "\n" +
-                              "                    tag_array allocs: " + data.func_loc_name_time_assoc[loc][5] + 
+                              "                    array allocs: " + data.func_loc_name_time_assoc[loc][5] + 
 //                              " (" + 100*data.func_loc_name_time_assoc[loc][5]/total_allocs + "%)" + 
                               "\n" +
-                              "                    tag_float allocs: " + data.func_loc_name_time_assoc[loc][6] + 
+                              "                    float allocs: " + data.func_loc_name_time_assoc[loc][6] + 
 //                              " (" + 100*data.func_loc_name_time_assoc[loc][6]/total_allocs + "%)" + 
                               "\n" +
-                              "                    tag_string allocs: " + data.func_loc_name_time_assoc[loc][7] + 
+                              "                    string allocs: " + data.func_loc_name_time_assoc[loc][7] + 
 //                              " (" + 100*data.func_loc_name_time_assoc[loc][7]/total_allocs + "%)" + 
                               "\n" +
-                              "                    tag_other allocs: " + data.func_loc_name_time_assoc[loc][8] + 
+                              "                    other allocs: " + data.func_loc_name_time_assoc[loc][8] + 
 //                              " (" + 100*data.func_loc_name_time_assoc[loc][8]/total_allocs + "%)" + 
                               "\n" +                              
                               "                  ->Total allocs: " + total_allocs + 
