@@ -1097,11 +1097,11 @@ function NewExpr_1(p, MemberExpr)
     return MemberExpr;
 }
 
-function NewExpr_2(p, NEW, NewExpr)
+function NewExpr_2(p, NEW, expr)
 {
-    return new NewExpr(NEW.loc.join(NewExpr.loc),
-                       NewExpr,
-                       null);
+    return new NewExpr(NEW.loc.join(expr.loc),
+                       expr,
+                       []);
 }
 
 function NewExprNoBF_1(p, MemberExprNoBF)
