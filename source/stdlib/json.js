@@ -72,6 +72,7 @@ JSON.parse = function (
 {
     var index = 0;
 
+    // Return current char code, or undefined if at the end of input.
     function current ()
     {
         if (index < text.length)
@@ -80,6 +81,7 @@ JSON.parse = function (
             return undefined;
     }
 
+    // Skip <n> characters from input.
     function consume (
         n
     )
@@ -87,6 +89,7 @@ JSON.parse = function (
         index += (n === undefined ? 1 : n);
     }
 
+    // Set input to the next non whitespace character.
     function skipWhiteSpace ()
     {
         var c;
@@ -102,6 +105,7 @@ JSON.parse = function (
         }
     }
 
+    // Parse a JSON input and return its value.
     function parseJSON ()
     {
         skipWhiteSpace();

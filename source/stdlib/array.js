@@ -48,6 +48,8 @@ Implementation of ECMAScript 5 array library routines.
 Marc Feeley, Maxime Chevalier-Boisvert
 */
 
+Array = (function () {
+
 /**
 15.4.2 Array constructor function.
 new Array (len)
@@ -646,3 +648,7 @@ Array.prototype.reduce            = array_reduce;
 Array.prototype.reduceRight       = array_reduceRight;
 
 //-----------------------------------------------------------------------------
+
+return Array;
+    
+})();    
