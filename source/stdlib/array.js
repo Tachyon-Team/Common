@@ -48,6 +48,8 @@ Implementation of ECMAScript 5 array library routines.
 Marc Feeley, Maxime Chevalier-Boisvert
 */
 
+Array = (function () {
+
 /**
 15.4.2 Array constructor function.
 new Array (len)
@@ -155,34 +157,9 @@ function array_concat()
     return a;
 }
 
-// function array_join(separator)
-// {
-//     var o = array_toObject(this);
-
-//     if (separator === undefined)
-//         separator = ",";
-//     else
-//         separator = separator.toString();
-
-//     var str = "";
-//     for (var i=o.length-1; i>=0; i--)
-//     {
-//         var e = o[i];
-
-//         var estr = (i !== 0) ? separator : "";
-
-//         if (e !== UNDEFINED)
-//         {
-//             estr = estr + String(e);
-//         }
-
-//         str = estr + str;
-//     }
-
-//     return str;
-// }
-
-function array_join(separator)
+function array_join (
+    separator
+)
 {
     var o = array_toObject(this);
 
@@ -190,30 +167,38 @@ function array_join(separator)
         separator = ",";
     else
         separator = separator.toString();
-    
-    var len = 0;
+
+
+    var length = 0;
     var strarray = new Array(o.length);
-    
+
     for (var i = 0; i < o.length; ++i)
     {
-        var str = o[i].toString();
-        len += str.length;
+        var str;
+        if (o[i] !== undefined)
+            str = o[i].toString();
+        else
+            str = "";
+        length += str.length;
         strarray[i] = str;
     }
-    len += (o.length - 1) * separator.length;
+    length += (o.length - 1) * separator.length;
 
-    if (len > 0)
+    if (length > 0)
     {
-        joinCharArray = new Array(len);
-        for (var i = 0, k = 0; i < strarray.length; ++i)
+        var s = alloc_str(unboxInt(length));
+
+        for (var i = 0, k = pint(0); i < strarray.length; ++i)
         {
             for (var j = 0; j < strarray[i].length; ++j, ++k)
-                joinCharArray[k] = strarray[i].charCodeAt(j);
+                set_str_data(s, k, iir.icast(IRType.u16, unboxInt( strarray[i].charCodeAt(j) )));
             if (i < strarray.length - 1)
                 for (var j = 0; j < separator.length; ++j, ++k)
-                    joinCharArray[k] = separator.charCodeAt(j);
+                    set_str_data(s, k, iir.icast(IRType.u16, unboxInt( separator.charCodeAt(j) )));
         }
-        return String.fromCharCode.apply(null, joinCharArray);
+
+        compStrHash(s);
+        return getTableStr(s);
     }
     return "";
 }
@@ -563,6 +548,34 @@ function array_lastIndexOf(searchElement, fromIndex)
     return -1;
 }
 
+function array_every (
+    callbackfn,
+    thisArg
+)
+{
+    var o = array_toObject(this);
+    var len = o.length;
+
+    for (var i = 0; i < len; i++)
+        if (!callbackfn.call(thisArg, o[i], i, o))
+            return false;
+    return true;
+}
+
+function array_some (
+    callbackfn,
+    thisArg
+)
+{
+    var o = array_toObject(this);
+    var len = o.length;
+
+    for (var i = 0; i < len; i++)
+        if (callbackfn.call(thisArg, o[i], i, o))
+            return true;
+    return false;
+}
+
 function array_forEach(callbackfn, thisArg)
 {
     var o = array_toObject(this);
@@ -602,23 +615,40 @@ function array_filter(callbackfn, thisArg)
     return a;
 }
 
+function array_reduce ()
+{
+}
+
+function array_reduceRight ()
+{
+}
+
 // Setup Array.prototype .
 
-Array.prototype.toString    = array_toString;
-Array.prototype.concat      = array_concat;
-Array.prototype.join        = array_join;
-Array.prototype.pop         = array_pop;
-Array.prototype.push        = array_push;
-Array.prototype.reverse     = array_reverse;
-Array.prototype.shift       = array_shift;
-Array.prototype.slice       = array_slice;
-Array.prototype.sort        = array_sort;
-Array.prototype.splice      = array_splice;
-Array.prototype.unshift     = array_unshift;
-Array.prototype.indexOf     = array_indexOf;
-Array.prototype.lastIndexOf = array_lastIndexOf;
-Array.prototype.forEach     = array_forEach;
-Array.prototype.map         = array_map;
-Array.prototype.filter      = array_filter;
+Array.prototype.toString          = array_toString;
+Array.prototype.toLocaleString    = array_toString;
+Array.prototype.concat            = array_concat;
+Array.prototype.join              = array_join;
+Array.prototype.pop               = array_pop;
+Array.prototype.push              = array_push;
+Array.prototype.reverse           = array_reverse;
+Array.prototype.shift             = array_shift;
+Array.prototype.slice             = array_slice;
+Array.prototype.sort              = array_sort;
+Array.prototype.splice            = array_splice;
+Array.prototype.unshift           = array_unshift;
+Array.prototype.indexOf           = array_indexOf;
+Array.prototype.lastIndexOf       = array_lastIndexOf;
+Array.prototype.every             = array_every;
+Array.prototype.some              = array_some;
+Array.prototype.forEach           = array_forEach;
+Array.prototype.map               = array_map;
+Array.prototype.filter            = array_filter;
+Array.prototype.reduce            = array_reduce;
+Array.prototype.reduceRight       = array_reduceRight;
 
 //-----------------------------------------------------------------------------
+
+return Array;
+    
+})();    

@@ -67,10 +67,13 @@ function String(value)
         // Store the value in the new object
         // TODO: this should be a hidden/internal property
         this.value = strVal;
+
+        // Set length property.
+        this.length = string_internal_getLength(strVal);
     }
     else
     {
-       // Convert the value to a string
+        // Convert the value to a string
         return boxToString(value);
     }
 }
@@ -94,9 +97,24 @@ Anonymous function to initialize this library
 
 //-----------------------------------------------------------------------------
 
-// Operations on String objects.
+/**
+Internal string functions.
+*/
 
-function string_internal_charCodeAt(s, pos)
+function string_internal_toString (
+    s
+)
+{
+    if (s instanceof String)
+        return s.value;
+
+    return s;
+}
+
+function string_internal_charCodeAt (
+    s,
+    pos
+)
 {
     var idx = unboxInt(pos);
 
@@ -105,7 +123,9 @@ function string_internal_charCodeAt(s, pos)
     return boxInt(iir.icast(IRType.pint, ch));
 }
 
-function string_internal_getLength(s)
+function string_internal_getLength (
+    s
+)
 {
     "tachyon:noglobal";
 
@@ -114,7 +134,9 @@ function string_internal_getLength(s)
     return boxInt(strLen);
 }
 
-function string_internal_toCharCodeArray(x)
+function string_internal_toCharCodeArray (
+    x
+)
 {
     var s = x.toString();
     var a = new Array(s.length);
@@ -128,7 +150,9 @@ function string_internal_toCharCodeArray(x)
     return a;
 }
 
-function string_internal_fromCharCodeArray(a)
+function string_internal_fromCharCodeArray (
+    a
+)
 {
     "tachyon:noglobal";
 
@@ -158,45 +182,49 @@ function string_internal_fromCharCodeArray(a)
     return getTableStr(strObj);
 }
 
-function string_internal_toString(s)
+function string_internal_isWhiteSpace (
+    c
+)
 {
-    if (s instanceof String)
-        return s.value;
-
-    return s;
+    return (c >= 9 && c <= 13) || (c === 32) ||
+           (c === 160) || (c >= 8192 && c <= 8202) || (c === 8232) ||
+           (c === 8233) || (c === 8239) || (c === 8287) ||
+           (c === 12288) || (c === 65279);
 }
 
-function string_toString()
-{
-    return string_internal_toString(this);
-}
+//-----------------------------------------------------------------------------
 
-function string_valueOf()
-{
-    return string_internal_toString(this);
-}
-
+/**
+15.5.3.2 String.fromCharCode([char0 [, char1 [, ... ]]])
+*/
 function string_fromCharCode()
 {
     var args = Array.prototype.slice.call(arguments, 0);
     return string_internal_fromCharCodeArray(args);
 }
 
-function string_charCodeAt(pos)
+/**
+15.5.4.2 String.prototype.toString()
+*/
+function string_toString ()
 {
-    var len = string_internal_getLength(this);
-
-    if (pos >= 0 && pos < len)
-    {
-        return string_internal_charCodeAt(this, pos);
-    }
-
-    // FIXME: return NaN when doubles are implemented
-    // error("Invalid string index in 'charCodeAt'")
-    return -1;
+    return string_internal_toString(this);
 }
 
-function string_charAt(pos)
+/**
+15.5.4.3 String.prototype.valueOf()
+*/
+function string_valueOf ()
+{
+    return string_internal_toString(this);
+}
+
+/**
+15.5.4.4 String.prototype.charAt(pos)
+*/
+function string_charAt (
+    pos
+)
 {
     if (pos < 0 || pos >= string_internal_getLength(this))
     {
@@ -207,84 +235,109 @@ function string_charAt(pos)
     return string_internal_fromCharCodeArray([ch]);
 }
 
+/**
+15.5.4.5 String.prototype.charCodeAt(pos)
+*/
+function string_charCodeAt (
+    pos
+)
+{
+    var len = string_internal_getLength(this.toString());
+
+    if (pos >= 0 && pos < len)
+    {
+        return string_internal_charCodeAt(this.toString(), pos);
+    }
+
+    // FIXME: return NaN when doubles are implemented
+    return null;
+}
+
+/**
+15.5.4.6 String.prototype.concat([string1 [, string2 [, ... ]]])
+*/
 function string_concat()
 {
-    var a = string_internal_toCharCodeArray(this);
+    var l = this.length;
 
     for (var i = 0; i < arguments.length; ++i)
-    {
-        var arg = arguments[i];
-        a = a.concat(string_internal_toCharCodeArray(arg));
-    }
+        l += arguments[i].length;
 
-    return string_internal_fromCharCodeArray(a);
+    var s = alloc_str(unboxInt(l));
+    var k = pint(0);
+
+    for (var i = 0; i < this.length; ++i, ++k)
+        set_str_data(s, k, iir.icast(IRType.u16, unboxInt( this.charCodeAt(i) )));
+
+    for (var i = 0; i < arguments.length; ++i)
+        for (var j = 0; j < arguments[i].length; ++j, ++k)
+            set_str_data(s, k, iir.icast(IRType.u16, unboxInt( arguments[i].charCodeAt(j) )));
+
+    compStrHash(s);
+    return getTableStr(s);
 }
 
-function string_indexOf(searchString, pos)
+/**
+15.5.4.7 String.prototype.indexOf(searchString, position)
+*/
+function string_indexOf (
+    searchString,
+    pos
+)
 {
-    var search = string_internal_toCharCodeArray(searchString);
-    var searchLen = search.length;
+    var i;
 
-    var a = string_internal_toCharCodeArray(this);
-    var len = a.length;
+    if (pos === undefined || pos < 0)
+        i = 0;
+    else
+        i = pos;
 
-    if (pos === undefined || pos < 0) pos = 0;
-    if (searchLen > len) return -1;
-
-    var start = pos;
-    if (start > len) start = len;
-
-    if (searchLen === 0) return start;
-    
-    var end = a.length - searchLen;
-    var firstChar = search[0];
-    for (var i = pos; i <= end; i++)
+    for (; i < this.length; ++i)
     {
-        if (a[i] === firstChar)
-        {
-            var match = true;
-            for (var j = 1; j < searchLen; j++)
-            {
-                if (a[i + j] !== search[j])
-                {
-                    match = false;
-                    break;
-                }
-            }
-            if (match) return i;
-        }
-    }
+        var j;
 
+        for (j = 0; j < searchString.length; ++j)
+            if (this.charCodeAt(i + j) !== searchString.charCodeAt(j))
+                break;
+        if (j === searchString.length)
+            return i;
+    }
     return -1;
 }
 
-function string_lastIndexOf(searchString, pos)
+/**
+15.5.4.8 String.prototype.lastIndexOf(searchString, position)
+*/
+function string_lastIndexOf (
+    searchString,
+    pos
+)
 {
-    var search = string_internal_toCharCodeArray(searchString);
-    var searchLen = search.length;
+    if (searchString.length > this.length)
+        return -1;
 
-    var a = string_internal_toCharCodeArray(this);
-    var len = a.length;
+    if (pos === undefined)
+        pos = this.length;
+    else if (pos >= this.length)
+        pos = this.length;
+    else if (pos < 0)
+        pos = 0;
 
-    if (searchLen > len) return -1;
+    if (searchString.length === 0)
+        return pos;
 
-    if (pos === undefined) pos = len;
-    else if (pos >= len) pos = len;
-    else if (pos < 0) pos = 0;
-
-    if (searchLen === 0) return pos;
-
-    if (pos + searchLen > len) pos = len - searchLen;
+    if (pos + searchString.length > this.length)
+        pos = this.length - searchString.length;
     
-    var firstChar = search[0];
+    var firstChar = searchString.charCodeAt(0);
     for (var i = pos; i >= 0; i--)
     {
-        if (a[i] === firstChar)
+        if (this.charCodeAt(i) === firstChar)
         {
             var match = true;
-            for (var j = 1; j < searchLen; j++)
+            for (var j = 1; j < searchString.length; j++)
             {
-                if (a[i + j] !== search[j])
+                if (this.charCodeAt(i + j) !== searchString.charCodeAt(j))
                 {
                     match = false;
                     break;
@@ -297,30 +350,36 @@ function string_lastIndexOf(searchString, pos)
     return -1;
 }
 
-function string_localeCompare(that)
+/**
+15.5.4.9 String.prototype.localeCompare(that)
+*/
+function string_localeCompare (
+    that
+)
 {
-    var first = string_internal_toCharCodeArray(this);
-    var second = string_internal_toCharCodeArray(that);
-    
-    var len = first.length;
-    if (second.length < len) len = second.length;
+    var length = this.length;
+
+    if (that.length < length)
+        length = that.length;
 
     var i;
-    for (i = 0; i < len; i++)
+
+    for (i = 0; i < length; i++)
     {
-        var a = first[i];
-        var b = second[i];
+        var a = this.charCodeAt(i);
+        var b = this.charCodeAt(i);
+
         if (a !== b)
         {
             return a - b;
         }
     }
 
-    if (first.length > len)
+    if (this.length > length)
     {
         return 1;
     }
-    else if (second.length > len)
+    else if (that.length > length)
     {
         return -1;
     }
@@ -330,24 +389,19 @@ function string_localeCompare(that)
     }
 }
 
-function string_slice(start, end)
-{
-    var a = string_internal_toCharCodeArray(this);
-    return string_internal_fromCharCodeArray(a.slice(start, end));
-}
-
-function string_match(regexp)
+/**
+15.5.4.10 String.prototype.match(regexp)
+*/
+function string_match (
+    regexp
+)
 {
     var re;
 
     if (regexp instanceof RegExp)
-    {
         re = regexp;
-    }
     else
-    {
         re = new RegExp(regexp);
-    }
 
     if (re.global)
     {
@@ -355,13 +409,11 @@ function string_match(regexp)
         var match;
 
         while ((match = re.exec(this)) !== null)
-        {
             result.push(match[0]);
-        }
+
         if (result.length === 0)
-        {
             return null;
-        }
+
         return result;
     }
     else
@@ -370,20 +422,192 @@ function string_match(regexp)
     }
 }
 
-function string_search(regexp)
+/**
+15.5.4.11 String.prototype.replace(searchValue, replaceValue)
+*/
+function string_replace (
+    searchValue,
+    replaceValue
+)
+{
+    if (typeof searchValue === "string")
+    {
+        var pos = this.indexOf(searchValue);
+
+        if (typeof replaceValue === "function")
+        {
+            var ret = replaceValue(searchValue, pos, this.toString());
+
+            return this.substring(0, pos).concat(
+                new String(ret).toString(),
+                this.substring(pos + string_internal_getLength(searchValue)));
+        }
+        else
+        {
+            return this.substring(0, pos).concat(
+                replaceValue.toString(),
+                this.substring(pos + string_internal_getLength(searchValue)));
+        }
+    }
+    else if (searchValue instanceof RegExp)
+    {
+        // Save regexp state
+        var globalFlagSave = searchValue.global;
+        var lastIndexSave = searchValue.lastIndex;
+        var match;
+
+        // Set the regexp global to get matches' index
+        searchValue.global = true;
+        searchValue.lastIndex = 0;
+
+        // Will hold new string parts.
+        var nsparts = [];
+        var nslen = 0;
+        var i = 0;
+
+        do {
+            // Execute regexp
+            match = searchValue.exec(this);
+
+            // Stop if no match left
+            if (match === null)
+                break;
+
+            // Get the last match index
+            var matchIndex = searchValue.lastIndex - match[0].length;
+
+            if (typeof replaceValue === "function")
+            {
+                if (i < matchIndex)
+                    nsparts.push(this.substring(i, matchIndex));
+
+                // Compose the arguments array with the match array.
+                match.push(matchIndex);
+                match.push(this.toString());
+
+                var ret = replaceValue.apply(null, match);
+                nsparts.push(new String(ret).toString());
+            }
+            else
+            {
+                // Expand replaceValue
+                var rvparts = [];
+                var j = 0, k = 0;
+
+                // Get the string representation of the object.
+                replaceValue = replaceValue.toString();
+
+                for (; j < replaceValue.length; ++j)
+                {
+                    // Expand special $ form
+                    if (replaceValue.charCodeAt(j) === 36) // '$'
+                    {
+                        if (k < j)
+                            rvparts.push(replaceValue.substring(k, j));
+
+                        var c = replaceValue.charCodeAt(j + 1);
+
+                        if (c === 36) // '$'
+                        {
+                            ++j;
+                            rvparts.push("$");
+                        }
+                        else if (c === 38) // '&'
+                        {
+                            ++j;
+                            rvparts.push(match[0]);
+                        }
+                        else if (c === 96) // '`'
+                        {
+                            ++j;
+                            rvparts.push(this.substring(0, matchIndex));
+                        }
+                        else if (c === 39) // '''
+                        {
+                            ++j;
+                            rvparts.push(this.substring(searchValue.lastIndex));
+                        }
+                        else if (c >= 48 && c <= 57)
+                        {
+                            ++j;
+
+                            var n = 0;
+                            var cn = replaceValue.charCodeAt(j + 1);
+                            if (cn >= 48 && cn <= 57)
+                            {
+                                n = (cn - 48) * 10;
+                                ++j;
+                            }
+                            n += c - 48;
+
+                            // Push submatch if index is valid, or the raw string if not.
+                            if (n < match.length)
+                                rvparts.push(match[n]);
+                            else
+                                rvparts.push("$" + n);
+                        }
+                        else
+                        {
+                            rvparts.push("$");
+                        }
+                        k = j + 1;
+                    }
+                }
+
+                if (k === 0)
+                {
+                    if (i < matchIndex)
+                        nsparts.push(this.substring(i, matchIndex));
+
+                    // Not expansion occured : push raw replaceValue.
+                    if (replaceValue.length > 0)
+                        nsparts.push(replaceValue);
+                }
+                else
+                {
+                    // Get the last not expanded part of replaceValue.
+                    if (k < replaceValue.length - 1)
+                        rvparts.push(replaceValue.substring(k, replaceValue.length));
+
+                    if (i < matchIndex)
+                        nsparts.push(this.substring(i, matchIndex));
+
+                    var expandedrv = rvparts.join("");
+
+                    if (expandedrv.length > 0)
+                        nsparts.push(expandedrv);
+                }
+            }
+
+            i = searchValue.lastIndex;
+        } while (globalFlagSave);
+
+        if (i < this.length - 1)
+            nsparts.push(this.substring(i, this.length));
+
+        searchValue.global = globalFlagSave;
+        searchValue.lastIndex = lastIndexSave;
+
+        return nsparts.join("");
+    }
+    return this.toString();
+}
+
+/**
+15.5.4.12 String.prototype.search(regexp)
+*/
+function string_search (
+    regexp
+)
 {
     var re;
     var globalSave;
     var lastIndexSave;
 
     if (regexp instanceof RegExp)
-    {
         re = regexp;
-    }
     else
-    {
         re = new RegExp(regexp);
-    }
 
     globalSave = re.global;
     lastIndexSave = re.lastIndex;
@@ -402,158 +626,18 @@ function string_search(regexp)
     return matchIndex;
 }
 
-function string_replace(searchValue, replaceValue)
-{
-    // FIXME: support function as replaceValue
-    if (typeof searchValue === "string")
-    {
-        var pos = this.indexOf(searchValue);
-        if (pos >= 0)
-        {
-            return this.substring(0, pos).concat(
-                replaceValue.toString(),
-                this.substring(pos + string_internal_getLength(searchValue)));
-        }
-    }
-    else if (searchValue instanceof RegExp)
-    {
-        // Save regexp state
-        var global = searchValue.global;
-        var lastIndexSave = searchValue.lastIndex;
-        var match;
-
-        // Set the regexp global to get matches' index
-        searchValue.global = true;
-        searchValue.lastIndex = 0;
-
-        // Will hold new string parts.
-        var nsparts = [];
-        var nslen = 0;
-
-        var i = 0;
-        do {
-            // Execute regexp
-            match = searchValue.exec(this);
-
-            // Stop if no match left
-            if (match === null)
-                break;
-
-            // Get the last match index
-            var matchIndex = searchValue.lastIndex - match[0].length;
-
-            // Expand replaceValue
-            var rvparts = [];
-            var j = 0, k = 0;
-            for (; j < replaceValue.length; ++j)
-            {
-                // Expand special $ form
-                if (replaceValue.charCodeAt(j) === 36) // '$'
-                {
-                    if (k < j)
-                        rvparts.push(replaceValue.substring(k, j));
-
-                    var c = replaceValue.charCodeAt(j + 1);
-
-                    if (c === 36) // '$'
-                    {
-                        ++j;
-                        rvparts.push("$");
-                    }
-                    else if (c === 38) // '&'
-                    {
-                        ++j;
-                        rvparts.push(match[0]);
-                    }
-                    else if (c === 96) // '`'
-                    {
-                        ++j;
-                        rvparts.push(this.substring(0, matchIndex));
-                    }
-                    else if (c === 39) // '''
-                    {
-                        ++j;
-                        rvparts.push(this.substring(searchValue.lastIndex));
-                    }
-                    else if (c >= 48 && c <= 57)
-                    {
-                        ++j;
-
-                        var n = 0;
-                        var cn = replaceValue.charCodeAt(j + 1);
-                        if (cn >= 48 && cn <= 57)
-                        {
-                            n = (cn - 48) * 10;
-                            ++j;
-                        }
-                        n += c - 48;
-
-                        // Push submatch if index is valid, or the raw string if not.
-                        if (n < match.length)
-                            rvparts.push(match[n]);
-                        else
-                            rvparts.push("$" + n);
-                    }
-                    else
-                    {
-                        rvparts.push("$");
-                    }
-                    k = j + 1;
-                }
-            }
-
-            // Get the last not expanded part of replaceValue.
-            if (k < replaceValue.length - 1)
-                rvparts.push(replaceValue.substring(k, replaceValue.length));
-
-            if (i < matchIndex)
-            {
-                nsparts.push([i, matchIndex]);
-                nslen += matchIndex - i;
-            }
-
-            var expandedrv = rvparts.join("");
-            if (expandedrv.length > 0)
-            {
-                nsparts.push(expandedrv);
-                nslen += expandedrv.length;
-            }
-            i = searchValue.lastIndex;
-        } while (global);
-
-        if (i < this.length - 1)
-            nsparts.push([i, this.length]);
-
-        searchValue.global = global;
-        searchValue.lastIndex = lastIndexSave;
-
-        // Build new string from parts.
-        var chars = new Array(nslen);
-        for (var i = 0, k = 0; i < nsparts.length; ++i)
-        {
-            var part = nsparts[i];
-            if (typeof part === "string")
-            {
-                for (var j = 0; j < part.length; ++j, ++k)
-                    chars[k] = part.charCodeAt(j);
-            }
-            else
-            {
-                for (var j = part[0]; j < part[1]; ++j, ++k)
-                    chars[k] = this.charCodeAt(j);
-            }
-        }
-        return String.fromCharCode.apply(null, chars);
-    }
-    return this.toString();
-}
-
-function string_split(separator, limit)
+/**
+15.5.4.14 String.prototype.split(separator, limit)
+*/
+function string_split (
+    separator,
+    limit
+)
 {
     var res = new Array();
     if (limit === 0) return res;
 
-    var len = string_internal_getLength(this);
+    var len = this.length;
     if (len === 0) return res;
 
     if (separator === undefined)
@@ -561,7 +645,7 @@ function string_split(separator, limit)
 
     var pos = this.indexOf(separator);
     var start = 0;
-    var sepLen = string_internal_getLength(separator);
+    var sepLen = separator.length;
 
     while (pos >= 0)
     {
@@ -579,40 +663,64 @@ function string_split(separator, limit)
     return res;
 }
 
-function string_substring(start, end)
+/**
+15.5.4.15 String.prototype.substring(start, end)
+*/
+function string_substring (
+    start,
+    end
+)
 {
-    var a = string_internal_toCharCodeArray(this);
-    var len = a.length;
+    var source = this.toString();
+    var length = string_internal_getLength(source.toString());
 
-    var from = start;
-    var to = end;
+    if (start < 0)
+        start = 0;
+    else if (start > length)
+        start = length;
 
-    if (from < 0) from = 0;
-    else if (from > len) from = len;
+    if (end === undefined)
+        end = length;
+    else if (end > length)
+        end = length;
+    else if (end < 0)
+        end = 0;
 
-    if (to === undefined) to = len;
-    else if (to < 0) to = 0;
-    else if (to > len) to = len;
-
-    if (from > to)
+    if (start > end)
     {
-        // Swap 'from' and 'to'
-        var t = to;
-        to = from;
-        from = t;
+        var tmp = start;
+        start = end;
+        end = tmp;
     }
+    
+    // Allocate new string.
+    var s = alloc_str(unboxInt(end - start));
 
-    return string_internal_fromCharCodeArray(a.slice(from, to));
+    // Copy substring characters in the new allocated string.
+    for (var i = start, j = pint(0); i < end; ++i, ++j)
+        set_str_data(s, j, iir.icast(IRType.u16, unboxInt( source.charCodeAt(i) )));
+
+    compStrHash(s);
+    return getTableStr(s);
 }
 
-function string_substr(start, len)
+/**
+String.prototype.substr(start, length)
+*/
+function string_substr (
+    start,
+    length
+)
 {
-    var end = (len === undefined)? undefined:(start + len);
+    var end = (length === undefined) ? undefined : (start + length);
 
     return string_substring.apply(this, [start, end]);
 }
 
-function string_toLowerCase()
+/**
+15.5.4.16 String.prototype.toLowerCase()
+*/
+function string_toLowerCase ()
 {
     var a = string_internal_toCharCodeArray(this);
 
@@ -637,20 +745,22 @@ function string_toLowerCase()
     return string_internal_fromCharCodeArray(a);
 }
 
-function string_toLocaleLowerCase()
+/**
+15.5.4.17 String.prototype.toLocaleLowerCase()
+*/
+function string_toLocaleLowerCase ()
 {
     // FIXME: not quire correct for the full Unicode
     return this.toLowerCase();
 }
 
-function string_toUpperCase()
+/**
+15.5.4.18 String.prototype.toUpperCase()
+*/
+function string_toUpperCase ()
 {
     var a = string_internal_toCharCodeArray(this);
 
-    // This code assumes the array is a copy of the internal char array.
-    // It may be more efficient to expose the internal data directly and
-    // make a copy only when necessary.
-    
     for (var i = 0; i < a.length; i++)
     {
         var c = a[i];
@@ -668,65 +778,50 @@ function string_toUpperCase()
     return string_internal_fromCharCodeArray(a);
 }
 
-function string_toLocaleUpperCase()
+/**
+15.5.4.19 String.prototype.toLocaleUpperCase()
+*/
+function string_toLocaleUpperCase ()
 {
     // FIXME: not quire correct for the full Unicode
     return this.toUpperCase();
 }
 
-function string_internal_isWhiteSpace(c)
+/**
+15.5.4.20 String.prototype.trim()
+*/
+function string_trim ()
 {
-    // FIXME: add support for other Unicode characters
-    return (c >= 9 && c <= 13) || (c === 32) || (c === 160);
+    var from = 0, to = this.length - 1;
+
+    while (string_internal_isWhiteSpace(this.charCodeAt(from)))
+        ++from;
+
+    while (string_internal_isWhiteSpace(this.charCodeAt(to)))
+        --to;
+
+    return this.substring(from, to + 1);
 }
 
-function string_trim()
-{
-    var a = string_internal_toCharCodeArray(this);
-    var len = a.length;
-    var i;
+/**
+Setup String method.
+*/
 
-    var from = 0;
-    var to = len;
-
-    for (i = 0; i < len; i++)
-    {
-        var c = a[i];
-
-        if (!string_internal_isWhiteSpace(c))        
-        {
-            from = i;
-            break;
-        }
-    }
-
-    for (i = len - 1; i >= 0; i--)
-    {
-        var c = a[i];
-        if (!string_internal_isWhiteSpace(c))        
-        {
-            to = i + 1;
-            break;
-        }
-    }
-
-    return string_internal_fromCharCodeArray(a.slice(from, to));
-}
-
-// Setup string methods
 String.fromCharCode = string_fromCharCode;
 
-// Setup String.prototype
+/**
+Setup String prototype.
+*/
+
 String.prototype.toString = string_toString;
 String.prototype.charCodeAt = string_charCodeAt;
 String.prototype.valueOf = string_valueOf;
 String.prototype.charAt = string_charAt;
-String.prototype.charCodeAt = string_charCodeAt;
 String.prototype.concat = string_concat;
 String.prototype.indexOf = string_indexOf;
 String.prototype.lastIndexOf = string_lastIndexOf;
 String.prototype.localeCompare = string_localeCompare;
-String.prototype.slice = string_slice;
+String.prototype.slice = string_substring;
 String.prototype.match = string_match;
 String.prototype.replace = string_replace;
 String.prototype.search = string_search;
@@ -737,410 +832,14 @@ String.prototype.toLowerCase = string_toLowerCase;
 String.prototype.toLocaleLowerCase = string_toLocaleLowerCase;
 String.prototype.toUpperCase = string_toUpperCase;
 String.prototype.toLocaleUpperCase = string_toLocaleUpperCase;
-String.prototype.internal_isWhiteSpace = string_internal_isWhiteSpace;
 String.prototype.trim = string_trim;
+
+String.prototype.concat.length = 1;
+String.prototype.indexOf.length = 1;
+String.prototype.lastIndexOf.length = 1;
+String.prototype.slice.length = 2;
+String.prototype.split.length = 2;
+String.prototype.substring.length = 2;
 
 //-----------------------------------------------------------------------------
 
-/*
-function fail(expected, actual, f)
-{
-    var msg;
-    if (f !== undefined)
-    {
-        msg = "in " + f + ": ";
-    }
-    else
-    {
-        msg = "";
-    }
-
-    if (typeof expected !== typeof actual)
-    {
-        msg = msg + "(type mismatch) ";
-    }
-
-    msg = msg + "expected '" + expected + "', got '" + actual + "'";
-    print(msg);
-}
-
-function assertEq(expected, actual, f)
-{
-    if (expected !== actual) fail(expected, actual, f);
-}
-
-function assertArrayEq(expected, actual, f)
-{
-    if (expected.length === actual.length)
-    {
-        for (var i = 0; i < expected.length; i++)
-        {
-            if (expected[i] !== actual[i])
-            {
-                fail(expected, actual, f);
-                break;
-            }
-        }
-    }
-}
-
-function assertSignEq(expected, actual, f)
-{
-    if ((expected === 0 && actual === 0)
-            || (expected < 0 && actual < 0)
-            || (expected > 0 && actual > 0))
-        return;
-
-    fail(expected, actual, f);
-}
-
-// Check correctness.
-
-function check_internal_toCharCodeArray(s, a)
-{
-    assertArrayEq(a, string_internal_toCharCodeArray(s), "toCharCodeArray");
-}
-
-check_internal_toCharCodeArray("", []);
-check_internal_toCharCodeArray("a", [97]);
-check_internal_toCharCodeArray("ab", [97,98]);
-check_internal_toCharCodeArray("abc", [97,98,99]);
-
-function check_internal_fromCharCodeArray(s)
-{
-    var a = string_internal_toCharCodeArray(s);
-    assertEq(s.length, a.length);
-    assertEq(s, string_internal_fromCharCodeArray(a), "fromCharCodeArray");
-}
-
-check_internal_fromCharCodeArray("");
-check_internal_fromCharCodeArray("a");
-check_internal_fromCharCodeArray("ab");
-check_internal_fromCharCodeArray("abc");
-check_internal_fromCharCodeArray("abc def");
-check_internal_fromCharCodeArray("abc\ndef");
-
-function check_toString(s)
-{
-    assertEq(s.toString(), s.string_toString(), "toString");
-}
-
-check_toString("");
-check_toString("a");
-check_toString("ab");
-check_toString("abc");
-check_toString("abc def");
-check_valueOf("abc\ndef");
-
-function check_valueOf(s)
-{
-    assertEq(s.valueOf(), s.string_valueOf(), "valueOf"); 
-}
-
-check_valueOf("");
-check_valueOf("a");
-check_valueOf("ab");
-check_valueOf("abc");
-check_valueOf("abc def");
-check_valueOf("abc\ndef");
-
-function check_fromCharCode(arr)
-{
-    var s1 = String.fromCharCode.apply(arr);
-    var s2 = String.string_fromCharCode.apply(arr);
-
-    assertEq(s1, s2, "fromCharCode");
-}
-
-check_fromCharCode([]);
-check_fromCharCode([97]);
-check_fromCharCode([97,98]);
-check_fromCharCode([97, 98, 99, 32, 100, 101, 10, 102]);
-
-function check_charCodeAt(s)
-{
-    for (var i = -1; i <= s.length + 1; i++)
-    {
-        var res1 = s.charCodeAt(i);
-        var res2 = s.string_charCodeAt(i);
-
-        if (isNaN(res1)) res1 = -1;
-
-        assertEq(res1, res2, "charCodeAt");
-    }
-}
-
-check_charCodeAt("");
-check_charCodeAt("a");
-check_charCodeAt("ab");
-check_charCodeAt("abc");
-check_charCodeAt("abc def");
-check_charCodeAt("abc\ndef");
-
-function check_charAt(s)
-{
-    for (var i = -1; i <= s.length + 1; i++)
-    {
-        assertEq(s.charAt(i), s.string_charAt(i), "charAt");
-    }
-}
-
-check_charAt("");
-check_charAt("a");
-check_charAt("ab");
-check_charAt("abc");
-check_charAt("abc def");
-check_charAt("abc def");
-check_charAt("abc\ndef");
-
-function check_concat(s1, s2, s3, s4)
-{
-    if (s4 !== undefined)
-    {
-        assertEq(s1.concat(s2, s3, s4), s1.concat(s2, s3, s4), "concat");
-    }
-    else if (s3 !== undefined)
-    {
-        assertEq(s1.concat(s2, s3), s1.concat(s2, s3), "concat");
-    }
-    else if (s2 !== undefined)
-    {
-        assertEq(s1.concat(s2), s1.concat(s2), "concat");
-    }
-    else
-    {
-        assertEq(s1.concat(), s1.concat(), "concat");
-    }
-}
-
-check_concat("");
-check_concat("a");
-check_concat("ab");
-check_concat("", "ab");
-check_concat("ab", "");
-check_concat("ab", "cd");
-check_concat("ab", "", "cd");
-check_concat("ab", "cd", "");
-check_concat("ab", "cd", "de");
-check_concat("ab", "cd", "de", "fg");
-check_concat("ab\n", "cd\n", "de\n", "fg");
-
-function check_indexOf(s, w)
-{
-    assertEq(s.indexOf(w), s.string_indexOf(w), "indexOf");
-    for (var i = -1; i <= s.length + 1; i++)
-    {
-        assertEq(s.indexOf(w, i), s.string_indexOf(w, i), "indexOf");
-    }
-}
-
-check_indexOf("", "");
-check_indexOf("", "a");
-check_indexOf("a", "");
-check_indexOf("a", "a");
-check_indexOf("a", "b");
-check_indexOf("ab", "ab");
-check_indexOf("ab", "ba");
-check_indexOf("abcdef", "ab");
-check_indexOf("abcdef", "bc");
-check_indexOf("abcdef", "cd");
-check_indexOf("abcdef", "de");
-check_indexOf("abcdef", "ef");
-check_indexOf("abcdef", "bcde");
-check_indexOf("abcdef", "defg");
-check_indexOf("aaaaaa", "a");
-check_indexOf("ababaab", "ab");
-
-function check_lastIndexOf(s, w)
-{
-    assertEq(s.lastIndexOf(w), s.string_lastIndexOf(w), "lastIndexOf");
-    for (var i = -1; i <= s.length + 1; i++)
-    {
-        assertEq(s.lastIndexOf(w, i), s.string_lastIndexOf(w, i), "lastIndexOf");
-    }
-}
-
-check_lastIndexOf("", "");
-check_lastIndexOf("", "a");
-check_lastIndexOf("a", "");
-check_lastIndexOf("a", "a");
-check_lastIndexOf("a", "b");
-check_lastIndexOf("ab", "ab");
-check_lastIndexOf("ab", "ba");
-check_lastIndexOf("abcdef", "ab");
-check_lastIndexOf("abcdef", "bc");
-check_lastIndexOf("abcdef", "cd");
-check_lastIndexOf("abcdef", "de");
-check_lastIndexOf("abcdef", "ef");
-check_lastIndexOf("abcdef", "bcde");
-check_lastIndexOf("abcdef", "defg");
-
-function check_localeCompare(s1, s2)
-{
-    var s1_copy = s1.slice(0);
-    var s2_copy = s2.slice(0);
-
-    var res1 = s1.localeCompare(s2);
-    var res2 = s1_copy.string_localeCompare(s2_copy);
-    assertSignEq(res1, res2, "localeCompare");
-}
-
-check_localeCompare("", "");
-check_localeCompare("a", "a");
-check_localeCompare("ab", "ab");
-check_localeCompare("ab", "bc");
-check_localeCompare("cd", "ab");
-check_localeCompare("", "ab");
-check_localeCompare("ab", "");
-
-function check_slice(s)
-{
-    assertEq(s.slice(), s.string_slice(), "slice");
-    for (var i = -1; i <= s.length + 1; i++)
-    {
-        assertEq(s.slice(i), s.string_slice(i));
-        for (var j = -1; j <= s.length + 1; j++)
-        {
-            assertEq(s.slice(i, j), s.string_slice(i, j), "slice");
-        }
-    }
-}
-
-check_slice("");
-check_slice("a");
-check_slice("ab");
-check_slice("abc");
-check_slice("abc def");
-
-function check_match()
-{
-    // TODO: implement
-}
-
-function check_replace(s, pat, repl)
-{
-    assertEq(s.replace(pat, repl), s.string_replace(pat, repl));
-}
-
-check_replace("", "", "");
-check_replace("a", "", "");
-check_replace("", "a", "");
-check_replace("", "", "a");
-check_replace("a", "a", "b");
-check_replace("a", "c", "b");
-check_replace("abc", "b", "xYz");
-check_replace("abcdef", "bc", "xYz");
-check_replace("abcdef", "bc", "xYz");
-
-function check_search()
-{
-    // TODO: implement
-}
-
-function check_split(s, sep)
-{
-    assertArrayEq(s.split(s, sep), s.string_split(s, sep), "split");
-    for (var i = 0; i <= s.length + 1; i++)
-    {
-        assertArrayEq(s.split(s, sep, i), s.string_split(s, sep, i), "split");
-    }
-}
-
-check_split("", "");
-check_split("a", "");
-check_split("ab", "");
-check_split("abc", "");
-check_split("a", "a");
-check_split("ab", "b");
-check_split("ab", "c");
-check_split("ab", "ab");
-check_split("aaaaaa", "a");
-check_split("ababab", "ab");
-check_split("", "ab");
-
-function check_substring(s, from, to)
-{
-    assertEq(s.substring(), s.string_substring(), "substring");
-    for (var i = -1; i <= s.length + 1; i++)
-    {
-        assertEq(s.substring(i), s.string_substring(i));
-        for (var j = -1; j <= s.length + 1; j++)
-        {
-            assertEq(s.substring(i, j), s.string_substring(i, j), "substring");
-        }
-    }
-}
-
-check_substring("");
-check_substring("a");
-check_substring("ab");
-check_substring("abc def");
-
-function check_toLowerCase(s)
-{
-    var s1 = s.slice(0);
-    var s2 = s.slice(0);
-
-    assertEq(s1.toLowerCase(), s2.string_toLowerCase(), "toLowerCase");
-}
-
-check_toLowerCase("");
-check_toLowerCase("abc\ndef");
-check_toLowerCase("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
-check_toLowerCase("àâéèêîôùûÀÂÉÈÊÎÔÙÛ");
-
-function check_toLocaleLowerCase(s)
-{
-    var s1 = s.slice(0);
-    var s2 = s.slice(0);
-
-    assertEq(s1.toLocaleLowerCase(), s2.string_toLocaleLowerCase(), "toLocaleLowerCase");
-}
-
-check_toLocaleLowerCase("");
-check_toLocaleLowerCase("AbC\nDeF");
-check_toLocaleLowerCase("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
-check_toLocaleLowerCase("àâéèêîôùûÀÂÉÈÊÎÔÙÛ");
-
-function check_toUpperCase(s)
-{
-    var s1 = s.slice(0);
-    var s2 = s.slice(0);
-
-    assertEq(s1.toUpperCase(), s2.string_toUpperCase(), "toUpperCase");
-}
-
-check_toUpperCase("");
-check_toUpperCase("AbC\nDeF");
-check_toUpperCase("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
-check_toUpperCase("àâéèêîôùûÀÂÉÈÊÎÔÙÛ");
-
-function check_toLocaleUpperCase(s)
-{
-    var s1 = s.slice(0);
-    var s2 = s.slice(0);
-
-    assertEq(s1.toLocaleUpperCase(), s2.string_toLocaleUpperCase(), "toLocaleUpperCase");
-}
-
-check_toLocaleUpperCase("");
-check_toLocaleUpperCase("AbC\nDeF");
-check_toLocaleUpperCase("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
-check_toLocaleUpperCase("àâéèêîôùûÀÂÉÈÊÎÔÙÛ");
-
-function check_trim(s)
-{
-    var s1 = s.slice(0);
-    var s2 = s.slice(0);
-
-    assertEq(s1.trim(), s2.string_trim(), "trim");
-}
-
-check_trim("");
-check_trim("a");
-check_trim("abc");
-check_trim(" abc");
-check_trim("abc ");
-check_trim(" \t\r\nX \t\r\n");
-
-*/

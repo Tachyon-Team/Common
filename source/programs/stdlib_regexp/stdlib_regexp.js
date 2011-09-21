@@ -72,161 +72,177 @@ function check_equal_matches (
 function test_char_match ()
 {    
     if (!check_equal_matches(new RegExp("a").exec("a"), ["a"]))
-        return false;
+        return 1;
     if (!check_equal_matches(new RegExp("a").exec("b"), null))
-        return false;
+        return 2;
     if (!check_equal_matches(new RegExp("\\t\\n\\v\\f\\r").exec("\t\n\v\f\r"), ["\t\n\v\f\r"]))
-        return false;
-    return true;
+        return 3;
+    return 0;
 }
 
 function test_char_class_match ()
 {
     if (!check_equal_matches(new RegExp("[^a]").exec("b"), ["b"]))
-        return false;
+        return 1;
     if (!check_equal_matches(new RegExp("[^a]").exec("a"), null))
-        return false;
+        return 2;
     if (!check_equal_matches(new RegExp(".").exec("a"), ["a"]))
-        return false;
+        return 3;
     if (!check_equal_matches(new RegExp(".").exec("\n"), null))
-        return false;
+        return 4;
     if (!check_equal_matches(new RegExp("[ab]").exec("a"), ["a"]))
-        return false;
+        return 5;
     if (!check_equal_matches(new RegExp("[ab]").exec("c"), null))
-        return false;
+        return 6;
     if (!check_equal_matches(new RegExp("\\d+").exec("foobar42foo"), ["42"]))
-        return false;
+        return 7;
     if (!check_equal_matches(new RegExp("\\D+").exec("foobar42foo"), ["foobar"]))
-        return false;
+        return 8;
     if (!check_equal_matches(new RegExp("\\s+").exec("foobar  42foo"), ["  "]))
-        return false;
+        return 9;
     if (!check_equal_matches(new RegExp("\\S+").exec("foobar  42foo"), ["foobar"]))
-        return false;
+        return 10;
     if (!check_equal_matches(new RegExp("\\w+").exec("foobar  42foo"), ["foobar"]))
-        return false;
+        return 11;
     if (!check_equal_matches(new RegExp("\\W+").exec("foobar  ?+=/42foo"), ["  ?+=/"]))
-        return false;
-    return true;
+        return 12;
+    return 0;
 }
 
 function test_assertion ()
 {
     if (!check_equal_matches(new RegExp("^$").exec(""), [""]))
-        return false;
+        return 1;
     if (!check_equal_matches(new RegExp("^foo").exec("foo"), ["foo"]))
-        return false;
+        return 2;
     if (!check_equal_matches(new RegExp("^foo").exec(" foo"), null))
-        return false;
+        return 3;
     if (!check_equal_matches(new RegExp("^foo$").exec("foo"), ["foo"]))
-        return false;
+        return 4;
     if (!check_equal_matches(new RegExp("^foo$").exec("foo "), null))
-        return false;
+        return 5;
     if (!check_equal_matches(new RegExp("(?=(a+))a*b\\1").exec("baaabac"), ["aba", "a"]))
-        return false;
+        return 6;
     if (!check_equal_matches(new RegExp("(?=(a+))").exec("baaabac"), ["", "aaa"]))
-        return false;
+        return 7;
     if (!check_equal_matches(new RegExp("(?!foo).*").exec("foofoobar"), ["oofoobar"]))
-        return false;
+        return 8;
     if (!check_equal_matches(new RegExp("(.*?)a(?!(a+)b\\2c)\\2(.*)").exec("baaabaac"), ["baaabaac", "ba", undefined, "abaac"]))
-        return false;
+        return 9;
     if (!check_equal_matches(new RegExp("a+ \\bb+").exec("aaaaa bbb"), ["aaaaa bbb"]))
-        return false;
+        return 10;
     if (!check_equal_matches(new RegExp("a+\\Bb+").exec("aaaaabbb"), ["aaaaabbb"]))
-        return false;
-    return true;
+        return 11;
+    return 0;
 
 }
 
 function test_quantifier ()
 {
     if (!check_equal_matches(new RegExp("a??").exec("a"), [""]))
-        return false;
+        return 1;
     if (!check_equal_matches(new RegExp("a??").exec("b"), [""]))
-        return false;
+        return 2;
     if (!check_equal_matches(new RegExp("a??").exec(""), [""]))
-        return false;
+        return 3;
     if (!check_equal_matches(new RegExp("a[a-z]{2,4}").exec("abcdefghi"), ["abcde"]))
-        return false;
+        return 4;
     if (!check_equal_matches(new RegExp("a[a-z]{2,4}?").exec("abcdefghi"), ["abc"]))
-        return false;
+        return 5;
     if (!check_equal_matches(new RegExp("(a*)(b*)").exec("aaaabbbb"), ["aaaabbbb", "aaaa", "bbbb"]))
-        return false;
+        return 6;
     if (!check_equal_matches(new RegExp("(a*?)(b*?)").exec("aaaabbbb"), ["", "", ""]))
-        return false;
+        return 7;
     if (!check_equal_matches(new RegExp("(a*?)(b+?)").exec("aaaabbb"), ["aaaab", "aaaa", "b"]))
-        return false;
+        return 8;
     if (!check_equal_matches(new RegExp("(x*)*").exec("xxx"), ["xxx", "xxx"]))
-        return false;
-    if (!check_equal_matches(new RegExp("(a*)*").exec("b"), ["",undefined]))
-        return false;
+        return 9;
+    if (!check_equal_matches(new RegExp("(a*)*").exec("b"), ["", ""]))
+        return 10;
     if (!check_equal_matches(new RegExp("(((x*)*)*)*").exec("xxx"), ["xxx", "xxx", "xxx", "xxx"]))
-        return false;
+        return 11;
     if (!check_equal_matches(new RegExp("(x+x+)+y").exec("xxxxxxxxxxxxy"), ["xxxxxxxxxxxxy", "xxxxxxxxxxxx"]))
-        return false;
+        return 12;
     if (!check_equal_matches(new RegExp("(x+x+)+y").exec("xxxxx"), null))
-        return false;
-    return true;
+        return 13;
+    return 0;
 }
 
 function test_disjunction ()
 {
     if (!check_equal_matches(new RegExp("aa|bb|cc").exec("cc"), ["cc"]))
-        return false;
+        return 1;
     if (!check_equal_matches(new RegExp("(aa|aabaac|ba|b|c)*").exec("aabaac"), ["aaba", "ba"]))
-        return false;
+        return 2;
     if (!check_equal_matches(new RegExp("a|ab").exec("abc"), ["a"]))
-        return false;
-    return true;
+        return 3;
+    return 0;
 }
 
 function test_capture ()
 {
     if (!check_equal_matches(new RegExp("(z)((a+)?(b+)?(c))*").exec("zaacbbbcac"), ["zaacbbbcac", "z", "ac", "a", undefined, "c"]))
-        return false;
+        return 1;
     if (!check_equal_matches(new RegExp("^(.(.(.(.(.(.(.(.(.(.(.(.(.)))))))))))))$").exec("aaaaaaaaaaaaa"), ["aaaaaaaaaaaaa","aaaaaaaaaaaaa","aaaaaaaaaaaa","aaaaaaaaaaa","aaaaaaaaaa","aaaaaaaaa","aaaaaaaa","aaaaaaa","aaaaaa","aaaaa","aaaa","aaa","aa","a"]))
-        return false;
+        return 2;
     if (!check_equal_matches(new RegExp("((a)|(ab))((c)|(bc))").exec("abc"), ["abc", "a", "a", undefined, "bc", undefined, "bc"]))
-        return false;
+        return 3;
     if (!check_equal_matches(new RegExp("()").exec(""), ["", ""]))
-        return false;
-    return true;
+        return 4;
+    return 0;
 }
 
 function test_backreference ()
 {
     if (!check_equal_matches(new RegExp("<(.*)>(.*)</\\1>").exec("<h1>Foobar</h1>"), ["<h1>Foobar</h1>", "h1", "Foobar"]))
-        return false;
+        return 1;
     if (!check_equal_matches(new RegExp("(.)(.)(.)(.)(.)(.)(.)\\7\\6\\5\\4\\3\\2\\1").exec("abcdefggfedcba"), ["abcdefggfedcba", "a", "b", "c", "d", "e", "f", "g"]))
-        return false;
+        return 2;
     if (!check_equal_matches(new RegExp("(.)(.)(.)(.)(.)(.)(.)\\7\\6\\5\\4\\3\\2\\1").exec("abcdefgabcdefg"), null))
-        return false;
+        return 3;
     if (!check_equal_matches(new RegExp("(a*)b\\1+").exec("baaaac"), ["b", ""]))
-        return false;
+        return 4;
     if (!check_equal_matches(new RegExp("()\\1*").exec(""), ["", ""]))
-        return false;
+        return 5;
     if (!check_equal_matches(new RegExp("^(x?)(x?)(x?).*;(?:\\1|\\2|\\3x),(?:\\1|\\2x|\\3),(?:\\1x|\\2x|\\3),(?:\\1x|\\2x|\\3x),").exec("xxx;x,x,x,x,"), ["xxx;x,x,x,x,", "x", "", "x"]))
-        return false;
+        return 6;
     if (!check_equal_matches(new RegExp("^(a+)\\1*,(?:\\1)+$").exec("aaaaaaaaaa,aaaaaaaaaaaaaaa"), ["aaaaaaaaaa,aaaaaaaaaaaaaaa", "aaaaa"]))
-        return false;
-    return true;
+        return 7;
+    return 0;
 
 }
 
 function test ()
 {
-    if (!test_char_match())
-        return false;
-    if (!test_char_class_match())
-        return false;
-    if (!test_assertion())
-        return false;
-    if (!test_quantifier())
-        return false;
-    if (!test_disjunction())
-        return false;
-    if (!test_capture())
-        return false;
-    if (!test_backreference())
-        return false;
-    return true;
+    var r;
+
+    r = test_char_match();
+    if (r !== 0)
+        return 100 + r;
+
+    r = test_char_class_match();
+    if (r !== 0)
+        return 200 + r;
+
+    r = test_assertion();
+    if (r !== 0)
+        return 300 + r;
+
+    r = test_quantifier();
+    if (r !== 0)
+        return 400 + r;
+
+    r = test_disjunction();
+    if (r !== 0)
+        return 500 + r;
+
+    r = test_capture();
+    if (r !== 0)
+        return 600 + r;
+
+    r = test_backreference();
+    if (r !== 0)
+        return 700 + r;
+
+    return 0;
 }

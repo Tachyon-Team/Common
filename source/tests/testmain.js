@@ -59,11 +59,8 @@ function main()
     // Get the verbosity command-line option value
     var verbosity = log.level(args.options['v']);
 
-    // Get the 64-bit mode command-line option value
-    var x86_64 = args.options['x86_64'];
-
     // Initialize the Tachyon configuration
-    initConfig(x86_64, verbosity);
+    initConfig(PLATFORM_64BIT, verbosity);
 
     // Perform a minimal Tachyon compilation
     bootstrap(config.hostParams, false, false);

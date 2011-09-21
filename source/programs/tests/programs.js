@@ -762,6 +762,16 @@ tests.programs.es5_cmp = genTest(
 );
 
 /**
+Standard library global code tests.
+*/
+tests.programs.stdlib_global = genTest(
+    'programs/stdlib_global/stdlib_global.js',
+    'test',
+    [],
+    0
+);
+
+/**
 Standard library objects code tests.
 */
 tests.programs.stdlib_object = genTest(
@@ -770,7 +780,6 @@ tests.programs.stdlib_object = genTest(
     [],
     0
 );
-
 
 /**
 Standard library function code tests.
@@ -821,11 +830,22 @@ tests.programs.stdlib_string = genTest(
     [],
     0
 );
+
 /**
 Standard library regexp code tests.
 */
 tests.programs.stdlib_regexp = genTest(
     'programs/stdlib_regexp/stdlib_regexp.js',
+    'test',
+    [],
+    0
+);
+
+/**
+Standard library json code tests.
+*/
+tests.programs.stdlib_json = genTest(
+    'programs/stdlib_json/stdlib_json.js',
     'test',
     [],
     0
@@ -976,6 +996,7 @@ tests.programs.tachyon_bridge = genTest(
     [
         'programs/tachyon_bridge/tachyon_bridge.js',
         'utility/debug.js',
+        'ir/types.js',
         'platform/ffi.js',
         'platform/mcb.js',
     ],

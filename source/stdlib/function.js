@@ -64,6 +64,8 @@ function Function()
 */
 Function.prototype = {};
 
+Function.prototype.length = 0;
+
 /**
 Anonymous function to initialize this library
 */

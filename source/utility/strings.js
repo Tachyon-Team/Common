@@ -283,6 +283,27 @@ function rightPadStr(str, pad, len)
 }
 
 /**
+Limit the maximum the length of a string
+*/
+function capStrLen(str, maxLen, ellipsis)
+{
+    const ellipsisStr = '...';
+
+    if (str.length > maxLen)
+    {
+        if (ellipsis === true)
+            maxLen = maxLen - ellipsisStr.length;
+
+        str = str.substr(0, maxLen);
+
+        if (ellipsis === true)
+            str += ellipsisStr;
+    }
+
+    return str;
+}
+
+/**
 Remove a given set of characters from the start and end of a string
 */
 function stripStr(str, chars)

@@ -694,9 +694,63 @@ Scanner.prototype.parse_string = function ()
                 else if (c === LOWER_R_CH)
                     c = CR_CH;
                 else if (c === LOWER_X_CH)
-                    error("\\xXX string syntax not supported");
+                {
+                    // Parse \xXX string syntax
+                    var value = 0, i = 0;
+
+                    for (; i < 2; ++i)
+                    {
+                        var hc = this.lookahead_char(i);
+
+                        if (hc >= LOWER_A_CH && hc <= LOWER_F_CH)
+                            value = (value * 16) + (hc - 87);
+                        else if (hc >= UPPER_A_CH && hc <= UPPER_F_CH)
+                            value = (value * 16) + (hc - 55);
+                        else if (hc >= ZERO_CH && hc <= NINE_CH)
+                            value = (value * 16) + (hc - 48);
+                        else
+                            break;   
+                    }
+
+                    if (i !== 2)
+                    {
+                        c = LOWER_X_CH;
+                    }
+                    else
+                    {
+                        this.advance(2);
+                        c = value;
+                    }
+                }
                 else if (c === LOWER_U_CH)
-                    error("\\uXXXX string syntax not supported");
+                {
+                    // Parse \uXXXX string syntax
+                    var value = 0, i = 0;
+
+                    for (; i < 4; ++i)
+                    {
+                        var hc = this.lookahead_char(i);
+
+                        if (hc >= LOWER_A_CH && hc <= LOWER_F_CH)
+                            value = (value * 16) + (hc - 87);
+                        else if (hc >= UPPER_A_CH && hc <= UPPER_F_CH)
+                            value = (value * 16) + (hc - 55);
+                        else if (hc >= ZERO_CH && hc <= NINE_CH)
+                            value = (value * 16) + (hc - 48);
+                        else
+                            break;   
+                    }
+
+                    if (i !== 4)
+                    {
+                        c = LOWER_U_CH;
+                    }
+                    else
+                    {
+                        this.advance(4);
+                        c = value;
+                    }
+                }
                 chars.push(c);
             }
         }
