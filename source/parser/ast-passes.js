@@ -213,7 +213,17 @@ function ast_walk_statement(ast, ctx)
     {
         return ast;
     }
-    else
+    else if (ast instanceof AtomicStatement) /********* extensions *********/
+    {
+        ast.statement = ctx.walk_statement(ast.statement);
+        return ast;
+    }
+    else if (ast instanceof FutureStatement) /********* extensions *********/
+    {
+        ast.expr = ctx.walk_expr(ast.expr);
+        return ast;
+    }
+   else
     {
         //pp(ast);
         error("unknown ast in walk_statement");

@@ -436,50 +436,6 @@ function js_unparse_string(str)
 
 function ast_to_js(ast, ctx)
 {
-    function js_id_to_js(id)
-    {
-        return id;
-    }
-
-    function js_out(str, ctx)
-    {
-        ctx.port.write_string(str);
-    }
-
-    function js_indent(ctx)
-    {
-        for (var i=0; i<ctx.indent; i++)
-            js_out("    ", ctx);
-    }
-
-    function js_indent_begin(ctx)
-    {
-        ctx.indent++;
-    }
-
-    function js_indent_end(ctx)
-    {
-        ctx.indent--;
-    }
-
-    function js_annotation(annotation, ctx)
-    {
-        js_indent(ctx);
-        js_out("\"" + annotation + "\";\n", ctx);
-    }
-
-    function js_var(id, ctx)
-    {
-        js_indent(ctx);
-        js_out("var " + id + ";\n", ctx);
-    }
-
-    function js_var_assign(id, ctx)
-    {
-        js_indent(ctx);
-        js_out(id + " = ", ctx);
-    }
-
     if (ast === null)
         error("null ast");
     else if (ast instanceof Program)
@@ -503,10 +459,8 @@ function ast_to_js(ast, ctx)
     }
     else if (ast instanceof FunctionDeclaration)
     {
-        js_indent(ctx);
-        js_out(js_id_to_js(ast.id.toString()) + " = ", ctx);
-        ast_to_js(ast.funct, ctx);
-        js_out(";\n", ctx);
+        function_to_js(ast.funct, ast.id, ctx);
+        js_out("\n", ctx);
     }
     else if (ast instanceof ExprStatement)
     {
@@ -854,39 +808,7 @@ function ast_to_js(ast, ctx)
     else if (ast instanceof FunctionExpr)
     {
         js_out("(", ctx); // FIXME: V8 seems to require extra parentheses at toplevel
-        js_out("function ", ctx);
-
-        if (ast.id !== null)
-            js_out(js_id_to_js(ast.id.toString()), ctx);
-
-        js_out("(", ctx);
-
-        var sep = "";
-        for (var i=0; i<ast.params.length; i++)
-        {
-            js_out(sep, ctx);
-            js_out(js_id_to_js(ast.params[i].toString()), ctx);
-            sep = ", ";
-        }
-        js_out(")\n", ctx);
-
-        js_indent(ctx);
-        js_out("{\n", ctx);
-        js_indent_begin(ctx);
-
-        for (var a in ast.annotations)
-            js_annotation(ast.annotations[a].value, ctx);
-
-        for (var v in ast.vars)
-            if (!ast.vars[v].is_param)
-                js_var(js_id_to_js(v), ctx);
-
-        for (var i=0; i<ast.body.length; i++)
-            ast_to_js(ast.body[i], ctx);
-
-        js_indent_end(ctx);
-        js_indent(ctx);
-        js_out("}", ctx);
+        function_to_js(ast, null, ctx);
         js_out(")", ctx); // FIXME: V8 seems to require extra parentheses at toplevel
     }
     else if (ast instanceof Literal)
@@ -937,6 +859,90 @@ function ast_to_js(ast, ctx)
     }
     else
         error("UNKNOWN AST");
+}
+
+function function_to_js(ast, id, ctx)
+{
+    if (id === null)
+        id = ast.id;
+
+    js_out("function ", ctx);
+
+    if (id !== null)
+        js_out(js_id_to_js(id.toString()), ctx);
+
+    js_out("(", ctx);
+
+    var sep = "";
+    for (var i=0; i<ast.params.length; i++)
+    {
+        js_out(sep, ctx);
+        js_out(js_id_to_js(ast.params[i].toString()), ctx);
+        sep = ", ";
+    }
+    js_out(")\n", ctx);
+
+    js_indent(ctx);
+    js_out("{\n", ctx);
+    js_indent_begin(ctx);
+
+    for (var a in ast.annotations)
+        js_annotation(ast.annotations[a].value, ctx);
+
+    for (var v in ast.vars)
+        if (!ast.vars[v].is_param)
+            js_var(js_id_to_js(v), ctx);
+
+    for (var i=0; i<ast.body.length; i++)
+        ast_to_js(ast.body[i], ctx);
+
+    js_indent_end(ctx);
+    js_indent(ctx);
+    js_out("}", ctx);
+}
+
+function js_id_to_js(id)
+{
+    return id;
+}
+
+function js_out(str, ctx)
+{
+    ctx.port.write_string(str);
+}
+
+function js_indent(ctx)
+{
+    for (var i=0; i<ctx.indent; i++)
+        js_out("    ", ctx);
+}
+
+function js_indent_begin(ctx)
+{
+    ctx.indent++;
+}
+
+function js_indent_end(ctx)
+{
+    ctx.indent--;
+}
+
+function js_annotation(annotation, ctx)
+{
+    js_indent(ctx);
+    js_out("\"" + annotation + "\";\n", ctx);
+}
+
+function js_var(id, ctx)
+{
+    js_indent(ctx);
+    js_out("var " + id + ";\n", ctx);
+}
+
+function js_var_assign(id, ctx)
+{
+    js_indent(ctx);
+    js_out(id + " = ", ctx);
 }
 
 //=============================================================================

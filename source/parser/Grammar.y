@@ -243,6 +243,7 @@ static inline void setExceptionLocation(ThrowableExpressionData* node, unsigned 
 %token SWITCH WITH RESERVED
 %token THROW TRY CATCH FINALLY
 %token DEBUGGER
+%token ATOMIC FUTURE /********* extensions *********/
 
 /* give an if without an else higher precedence than an else to resolve the ambiguity */
 %nonassoc IF_WITHOUT_ELSE
@@ -859,6 +860,8 @@ Statement:
   | ThrowStatement
   | TryStatement
   | DebuggerStatement
+  | ATOMIC Block /********* extensions *********/
+  | FUTURE Expr ';' /********* extensions *********/
 ;
 
 Block:
