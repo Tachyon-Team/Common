@@ -71,8 +71,6 @@ function isPowerOf2(x)
 
     // (x & (x-1)) === 0
     return num_eq(num_and(x, num_sub(x, 1)), 0);
-
-    //return (x & (x-1)) === 0;
 }
 
 /**
