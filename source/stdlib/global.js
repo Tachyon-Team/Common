@@ -40,7 +40,9 @@
  * _________________________________________________________________________
  */
 
-function parseInt (
+(function () {
+
+parseInt = function (
     string,
     radix
 )
@@ -374,7 +376,7 @@ function encodeURI (
 /**
 15.1.3.4 encodeURIComponent(uriComponent)
 */
-function encodeURI (
+function encodeURIComponent (
     uri
 )
 {
@@ -392,11 +394,14 @@ function isNaN (
     number
 )
 {
+    return false;
 }
 
 function isFinite (
     number
 )
 {
+    return true;
 }
 
+})();

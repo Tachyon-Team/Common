@@ -213,7 +213,17 @@ function ast_walk_statement(ast, ctx)
     {
         return ast;
     }
-    else
+    else if (ast instanceof AtomicStatement) /********* extensions *********/
+    {
+        ast.statement = ctx.walk_statement(ast.statement);
+        return ast;
+    }
+    else if (ast instanceof FutureStatement) /********* extensions *********/
+    {
+        ast.expr = ctx.walk_expr(ast.expr);
+        return ast;
+    }
+   else
     {
         //pp(ast);
         error("unknown ast in walk_statement");
@@ -328,25 +338,189 @@ ast_pass1_ctx.prototype.walk_statement = function (ast)
     {
         var debug_lib = "                                                   \
                                                                             \
-          var debug$print = print;                                          \
-          var debug$nesting = 0;                                            \
+          var profile$print = print;                                        \
+          var profile$trace = false;                                        \
+          var profile$nesting = -1;                                         \
+          var profile$stack = [];                                           \
+          var profile$fn_abstypes = [];                                     \
                                                                             \
-          function debug$nest(loc, fn, enter)                               \
-          { var level = enter ? ++debug$nesting : debug$nesting--;          \
+          function profile$get_tp_descr()                                   \
+          { return profile$fn_abstypes[profile$stack[profile$nesting]];     \
+          }                                                                 \
+                                                                            \
+          function profile$enter_tp(fn, args)                               \
+          { var descr = profile$get_tp_descr();                             \
+            if (descr === undefined)                                        \
+              { var loc = profile$stack[profile$nesting];                   \
+                descr = { loc: loc,                                         \
+                          fn: fn,                                           \
+                          calls: 0,                                         \
+                          args: [],                                         \
+                          result: undefined                                 \
+                        };                                                  \
+                profile$fn_abstypes[loc] = descr;                           \
+              }                                                             \
+            descr.calls++;                                                  \
+            for (var i=0; i<args.length; i++)                               \
+               descr.args[i] = profile$abstype_add(descr.args[i], args[i]); \
+          }                                                                 \
+                                                                            \
+          function profile$return_tp(result)                                \
+          { var descr = profile$get_tp_descr();                             \
+            descr.result = profile$abstype_add(descr.result, result);       \
+          }                                                                 \
+                                                                            \
+          function profile$absnum_add(absnum, val)                          \
+          { if (absnum === undefined)                                       \
+              absnum = { minnum: val,                                       \
+                         maxnum: val                                        \
+                       };                                                   \
+            else if (val < absnum.minnum)                                   \
+              absnum.minnum = val;                                          \
+            else if (val > absnum.maxnum)                                   \
+              absnum.maxnum = val;                                          \
+            return absnum;                                                  \
+          }                                                                 \
+                                                                            \
+          function profile$absnum_to_string(absnum)                         \
+          { if (absnum.minnum === absnum.maxnum)                            \
+              return \"\" + absnum.minnum;                                 \
+            else                                                            \
+              return absnum.minnum + \"..\" + absnum.maxnum;                \
+          }                                                                 \
+                                                                            \
+          function profile$absbool_add(absbool, val)                        \
+          { if (absbool === undefined)                                      \
+              absbool = {};                                                 \
+            absbool[val] = true;                                            \
+            return absbool;                                                 \
+          }                                                                 \
+                                                                            \
+          function profile$absbool_to_string(absbool)                       \
+          { var str = \"\";                                                 \
+            if (absbool[true] !== undefined)                                \
+              { if (str !== \"\") str += \" U \"; str += \"true\"; }        \
+            if (absbool[false] !== undefined)                               \
+              { if (str !== \"\") str += \" U \"; str += \"false\"; }       \
+            return str;                                                     \
+          }                                                                 \
+                                                                            \
+          function profile$abstype_add(abstype, val)                        \
+          { if (abstype === undefined)                                      \
+              abstype = { num: undefined,                                   \
+                          str: undefined,                                   \
+                          bool: undefined,                                  \
+                          undef: undefined,                                 \
+                          nul: undefined,                                   \
+                          fn: undefined,                                    \
+                          obj: undefined,                                   \
+                          other: []                                         \
+                        };                                                  \
+            if (typeof val === 'number')                                    \
+              abstype.num = profile$absnum_add(abstype.num, val);           \
+            else if (typeof val === 'string')                               \
+              abstype.str = profile$absnum_add(abstype.str, val.length);    \
+            else if (typeof val === 'boolean')                              \
+              abstype.bool = profile$absbool_add(abstype.bool, val);        \
+            else if (val === undefined)                                     \
+              abstype.undef = true;                                         \
+            else if (val === null)                                          \
+              abstype.nul = true;                                           \
+            else if (typeof val === 'function')                             \
+              abstype.fn = true;                                            \
+            else if (typeof val === 'object')                               \
+              abstype.obj = true;                                           \
+            else                                                            \
+              abstype.other.push(val);                                      \
+            return abstype;                                                 \
+          }                                                                 \
+                                                                            \
+          function profile$abstype_to_string(abstype)                       \
+          { var str = \"\";                                                 \
+            if (abstype.num !== undefined)                                  \
+              { if (str !== \"\") str += \" U \";                           \
+                str += profile$absnum_to_string(abstype.num);               \
+              }                                                             \
+            if (abstype.str !== undefined)                                  \
+              { if (str !== \"\") str += \" U \";                           \
+                str += \"string[\" + profile$absnum_to_string(abstype.str) + \"]\"; \
+              }                                                             \
+            if (abstype.bool !== undefined)                                 \
+              { if (str !== \"\") str += \" U \";                           \
+                str += profile$absbool_to_string(abstype.bool);             \
+              }                                                             \
+            if (abstype.undef !== undefined)                                \
+              { if (str !== \"\") str += \" U \";                           \
+                str += \"undefined\";                                       \
+              }                                                             \
+            if (abstype.nul !== undefined)                                  \
+              { if (str !== \"\") str += \" U \";                           \
+                str += \"null\";                                            \
+              }                                                             \
+            if (abstype.fn !== undefined)                                   \
+              { if (str !== \"\") str += \" U \";                           \
+                str += \"function\";                                        \
+              }                                                             \
+            if (abstype.obj !== undefined)                                  \
+              { if (str !== \"\") str += \" U \";                           \
+                str += \"object\";                                          \
+              }                                                             \
+            if (abstype.other.length > 0)                                   \
+              { if (str !== \"\") str += \" U \";                           \
+                str += abstype.other.join(\" U \");                         \
+              }                                                             \
+            return str;                                                     \
+          }                                                                 \
+                                                                            \
+          function profile$dump()                                           \
+          { var descrs = [];                                                \
+            for (var loc in profile$fn_abstypes)                            \
+              descrs.push(profile$fn_abstypes[loc]);                        \
+            descrs.sort(function (x,y) { return (x.calls > y.calls) ? 1 : -1; }); \
+            print(\"--------------------------- TYPE PROFILE\");            \
+            print(\"\");                                                    \
+            for (var j=0; j<descrs.length; j++)                             \
+              { var descr = descrs[j];                                      \
+                profile$print(descr.calls + \" \" + descr.fn + \" \" + \"(\" + descr.loc + \":)\");                         \
+                for (var i=0; i<descr.args.length; i++)                     \
+                  {                                                         \
+                    print(\"     arg[\" + i + \"] = \" +                    \
+                          profile$abstype_to_string(descr.args[i]));        \
+                  }                                                         \
+                print(\"     result = \" +                                  \
+                      profile$abstype_to_string(descr.result));             \
+                print(\"\");                                                \
+              }                                                             \
+          }                                                                 \
+                                                                            \
+          function profile$nest(loc, fn, enter)                             \
+          { var level;                                                      \
+            if (enter)                                                      \
+              { level = ++profile$nesting;                                  \
+                profile$stack[level] = loc;                                 \
+              }                                                             \
+            else                                                            \
+              level = profile$nesting--;                                    \
+            if (!profile$trace) return;                                     \
             var prefix = \"\";                                              \
             if (level > 9) { prefix = \"|[\"+level+\"] \"; level = 8; }     \
             while (level-- > 0) prefix = \"|  \" + prefix;                  \
-            debug$print(prefix+(enter?\"((\":\"))\")+\" \"+loc+\": \"+fn);  \
+            profile$print(prefix+(enter?\"((\":\"))\")+\" \"+loc+\": \"+fn);\
           }                                                                 \
                                                                             \
-          function debug$enter(loc, fn)                                     \
-          { debug$nest(loc, fn, true); }                                    \
+          function profile$enter(loc, fn, args)                             \
+          { profile$nest(loc, fn, true);                                    \
+            profile$enter_tp(fn, args);                                     \
+          }                                                                 \
                                                                             \
-          function debug$return0(loc, fn)                                   \
-          { debug$nest(loc, fn, false); }                                   \
+          function profile$return0(loc)                                     \
+          { profile$return_tp(undefined);                                   \
+            profile$nest(loc, false);                                       \
+          }                                                                 \
                                                                             \
-          function debug$return1(loc, fn, result)                           \
-          { debug$nest(loc, fn, false);                                     \
+          function profile$return1(loc, result)                             \
+          { profile$return_tp(result);                                      \
+            profile$nest(loc, false);                                       \
             return result;                                                  \
           }                                                                 \
                                                                             \
@@ -359,6 +533,14 @@ ast_pass1_ctx.prototype.walk_statement = function (ast)
         ast_walk_statement(ast, this);
 
         ast.block.statements = prog.block.statements.concat(ast.block.statements);
+
+        ast.block.statements.push(
+            new ExprStatement(ast.loc,
+                              new CallExpr(ast.loc,
+                                           new Ref(ast.loc,
+                                                   new Token(IDENT_CAT, "profile$dump", ast.loc)),
+                                           [])));
+
         return ast;
     }
     else if (ast instanceof FunctionDeclaration)
@@ -378,14 +560,14 @@ ast_pass1_ctx.prototype.walk_statement = function (ast)
         }
         else if (ast.expr !== null)
         {
-            ast.expr = this.call_debug("debug$return1", ast.loc, ast.expr);
+            ast.expr = this.call_debug("profile$return1", ast.loc, ast.expr);
             return ast;
         }
         else
         {
             return new BlockStatement(ast.loc,
                                       [new ExprStatement(ast.loc,
-                                                        this.call_debug("debug$return0", ast.loc)),
+                                                        this.call_debug("profile$return0", ast.loc)),
                                        ast]);
         }
     }
@@ -408,11 +590,21 @@ ast_pass1_ctx.prototype.walk_expr = function (ast)
 
         if (this.filter_debug(ast))
         {
-            ast.body.unshift(new ExprStatement(ast.loc,
-                                               this.call_debug("debug$enter",
-                                                               ast.loc)));
+            ast.body.unshift(
+                new ExprStatement(ast.loc,
+                                  this.call_debug(
+                                      "profile$enter",
+                                      ast.loc,
+                                      new Literal(ast.loc,
+                                                  ((this.fn_decl !== null)
+                                                   ? this.fn_decl.id.toString()
+                                                   : "")
+                                                  + "(" + ast.params.join() + ")"),
+                                      new Ref(ast.loc,
+                                              new Token(IDENT_CAT, "arguments", ast.loc)))));
             ast.body.push(new ExprStatement(ast.loc,
-                                            this.call_debug("debug$return0", ast.loc)));
+                                            this.call_debug("profile$return0",
+                                                            ast.loc)));
         }
 
         return ast;
@@ -423,17 +615,13 @@ ast_pass1_ctx.prototype.walk_expr = function (ast)
     }
 };
 
-ast_pass1_ctx.prototype.call_debug = function (fn, loc, result)
+ast_pass1_ctx.prototype.call_debug = function (fn, loc)
 {
     var args = [new Literal(loc,
-                            loc.to_string()),
-                new Literal(loc,
-                            (this.fn_decl !== null)
-                            ? this.fn_decl.id.toString()
-                            : "?")];
+                            loc.to_string())];
 
-    if (result !== undefined)
-        args.push(result);
+    for (i=2; i<arguments.length; i++)
+        args.push(arguments[i]);
                     
     return new CallExpr(loc,
                         new Ref(loc,
@@ -1072,7 +1260,8 @@ function ast_normalize(ast, debug)
 {
     if (debug)
         ast_pass1(ast);
-    ast_pass2(ast);
+    else
+        ast_pass2(ast);
     ast_pass3(ast);
     ast_pass4(ast);
     ast_pass5(ast);

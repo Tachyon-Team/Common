@@ -80,6 +80,8 @@
 "void"
 "while"
 "with"
+"atomic" ;; ********* extensions *********
+"future" ;; ********* extensions *********
 
 ;; FutureReservedWord
 "class"
