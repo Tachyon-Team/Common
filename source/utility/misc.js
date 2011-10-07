@@ -62,14 +62,17 @@ Test if an integer value is a power of 2
 function isPowerOf2(x)
 {
     assert (
-        Math.floor(x) === x,
+        num_instance(x) || Math.floor(x) === x,
         'value must be integer'
     );
 
-    if (x <= 0)
+    if (num_le(x, 0) === true)
         return false;
 
-    return (x & (x-1)) === 0;
+    // (x & (x-1)) === 0
+    return num_eq(num_and(x, num_sub(x, 1)), 0);
+
+    //return (x & (x-1)) === 0;
 }
 
 /**
@@ -78,15 +81,15 @@ Find the highest bit set to 1 in an integer
 function highestBit(x)
 {
     assert (
-        Math.floor(x) === x,
+        num_instance(x) || Math.floor(x) === x,
         'value must be integer'
     );
 
     var ret = -1;
 
-    while (x !== 0)
+    while (num_ne(x, 0) === true)
     {
-        x >>= 1;
+        x = num_shift(x, -1);
         ret++;
     }
 

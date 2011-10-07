@@ -68,8 +68,8 @@ function main()
     // config.hostParams.print = print;
 
     // Run all unit tests
-    tests.run(true, undefined, true);
-    //tests.run(false, undefined, true);
+    //tests.run(true, undefined, true);
+    tests.run(false, undefined, true);
 }
 
 try
