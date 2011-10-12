@@ -107,9 +107,6 @@ Anonymous function to initialize this library
 
     // Set the global object prototype
     set_obj_proto(globalObj, Object.prototype);
-
-    // Set the undefined value on the global object
-    globalObj.undefined = UNDEFINED;
 })();
 
 //-----------------------------------------------------------------------------

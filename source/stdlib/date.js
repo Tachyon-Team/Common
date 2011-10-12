@@ -63,7 +63,9 @@ var MS_PER_DAY = 86400000;
 var MS_PER_HOUR = 3600000;
 var MS_PER_MINUTE = 60000;
 var MS_PER_SECOND = 1000;
-var TIME_YEAR_2000 = 946684800000;
+// FIXME: can't currently support this in 32-bit
+//var TIME_YEAR_2000 = 946684800000;
+var TIME_YEAR_2000 = 1337;
 
 var WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

@@ -40,8 +40,6 @@
  * _________________________________________________________________________
  */
 
-(function () {
-
 parseInt = function (
     string,
     radix
@@ -383,7 +381,6 @@ function encodeURIComponent (
     return _encodeURI(uri, unescapedClassFilterComponent);
 }
 
-
 function parseFloat (
     string
 )
@@ -404,4 +401,3 @@ function isFinite (
     return true;
 }
 
-})();
