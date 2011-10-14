@@ -349,7 +349,7 @@ ast_pass1_ctx.prototype.walk_statement = function (ast)
             new ExprStatement(ast.loc,
                               new CallExpr(ast.loc,
                                            new Ref(ast.loc,
-                                                   new Token(IDENT_CAT, "profile$dump", ast.loc)),
+                                                   new Token(IDENT_CAT, "profile$end_of_program", ast.loc)),
                                            [])));
 
         return ast;
@@ -643,7 +643,51 @@ function ast_pass1(ast)
 
 var profile_lib = "                                               \
                                                                   \
-var profile$print = print;                                        \
+function profile$String_output_port()                             \
+{                                                                 \
+    this.char_buffer = [];                                        \
+    this.string_buffer = [];                                      \
+}                                                                 \
+                                                                  \
+profile$String_output_port.prototype.empty_char_buffer = function () \
+{                                                                 \
+    if (this.char_buffer.length > 0)                              \
+    {                                                             \
+        this.string_buffer.push(String.fromCharCode.apply(null, this.char_buffer)); \
+        this.char_buffer = [];                                    \
+    }                                                             \
+};                                                                \
+                                                                  \
+profile$String_output_port.prototype.write_char = function (c)    \
+{                                                                 \
+    this.char_buffer.push(c);                                     \
+    if (this.char_buffer.length > 500)                            \
+        this.empty_char_buffer();                                 \
+};                                                                \
+                                                                  \
+profile$String_output_port.prototype.write_string = function (str) \
+{                                                                 \
+    for (var i=0; i<str.length; i++)                              \
+        this.write_char(str.charCodeAt(i));                       \
+};                                                                \
+                                                                  \
+profile$String_output_port.prototype.print = function (str) \
+{                                                                 \
+    this.write_string(str + \"\\n\");                             \
+};                                                                \
+                                                                  \
+profile$String_output_port.prototype.get_output_string = function () \
+{                                                                 \
+    this.empty_char_buffer();                                     \
+    return String.prototype.concat.apply(\"\", this.string_buffer); \
+};                                                                \
+                                                                  \
+function profile$print(str)                                       \
+{ profile$output.print(str);                                      \
+}                                                                 \
+                                                                  \
+var profile$output = new profile$String_output_port();            \
+                                                                  \
 var profile$trace = false;                                        \
 var profile$nesting = -1;                                         \
 var profile$stack = [];                                           \
@@ -930,50 +974,59 @@ function profile$abstype_to_string(abstype)                       \
   return str;                                                     \
 }                                                                 \
                                                                   \
-function profile$dump()                                           \
+function profile$report()                                         \
 { var fn_descrs = [];                                             \
   for (var loc in profile$fn_abstypes)                            \
     fn_descrs.push(profile$fn_abstypes[loc]);                     \
   fn_descrs.sort(function (x,y) { return (x.calls > y.calls) ? 1 : -1; }); \
+                                                                  \
   var prop_access_descrs = [];                                    \
   for (var loc in profile$prop_access_abstypes)                   \
     prop_access_descrs.push(profile$prop_access_abstypes[loc]);   \
   prop_access_descrs.sort(function (x,y) { return (x.accesses > y.accesses) ? 1 : -1; }); \
-  print(\"--------------------------- TYPE PROFILE\");            \
-  print(\"fetch_counter = \" + profile$fetch_counter);            \
-  print(\"store_counter = \" + profile$store_counter);            \
-  print(\"obj_counter = \" + profile$obj_counter);                \
-  print(\"new_counter = \" + profile$new_counter);                \
-  print(\"map_counter = \" + profile$map_counter);                \
-  print(\"hit_counter = \" + profile$hit_counter);                \
-  print(\"miss_counter = \" + profile$miss_counter);              \
-  print(\"\");                                                    \
+                                                                  \
+  profile$output = new profile$String_output_port();              \
+                                                                  \
+  profile$print(\"--------------------------- TYPE PROFILE\");    \
+  profile$print(\"fetch_counter = \" + profile$fetch_counter);    \
+  profile$print(\"store_counter = \" + profile$store_counter);    \
+  profile$print(\"obj_counter = \" + profile$obj_counter);        \
+  profile$print(\"new_counter = \" + profile$new_counter);        \
+  profile$print(\"map_counter = \" + profile$map_counter);        \
+  profile$print(\"hit_counter = \" + profile$hit_counter);        \
+  profile$print(\"miss_counter = \" + profile$miss_counter);      \
+  profile$print(\"\");                                            \
+                                                                  \
   for (var i=0; i<profile$maps.length; i++)                       \
   { var map = profile$maps[i];                                    \
-    print(\"map[\" + map.id + \"] = \" + profile$map_to_string(map)); \
+    profile$print(\"map[\" + map.id + \"] = \" + profile$map_to_string(map)); \
   }                                                               \
-  print(\"\");                                                    \
-  print(\"FUNCTION PROFILE:\");                                   \
-  print(\"\");                                                    \
+  profile$print(\"\");                                            \
+                                                                  \
+  profile$print(\"FUNCTION PROFILE:\");                           \
+  profile$print(\"\");                                            \
   for (var j=0; j<fn_descrs.length; j++)                          \
     { var descr = fn_descrs[j];                                   \
-      profile$print(descr.calls + \" \" + descr.fn + \" \" + \"(\" + descr.loc + \":)\");                         \
+      profile$print(descr.calls + \" \" + descr.fn + \" \" + \"(\" + descr.loc + \":)\"); \
       for (var i=0; i<descr.args.length; i++)                     \
         {                                                         \
-          print(\"     arg[\" + i + \"] = \" +                    \
+          profile$print(\"     arg[\" + i + \"] = \" +            \
                 profile$abstype_to_string(descr.args[i]));        \
         }                                                         \
-      print(\"     result = \" +                                  \
+      profile$print(\"     result = \" +                          \
             profile$abstype_to_string(descr.result));             \
-      print(\"\");                                                \
+      profile$print(\"\");                                        \
     }                                                             \
-  print(\"PROPERTY ACCESS RECEIVER PROFILE:\");                   \
-  print(\"\");                                                    \
+                                                                  \
+  profile$print(\"PROPERTY ACCESS RECEIVER PROFILE:\");           \
+  profile$print(\"\");                                            \
   for (var j=0; j<prop_access_descrs.length; j++)                 \
     { var descr = prop_access_descrs[j];                          \
       profile$print(descr.accesses + \" \" + \"(\" + descr.loc + \":) \" + profile$abstype_to_string(descr.abstype)); \
-      print(\"\");                                                \
+      profile$print(\"\");                                        \
     }                                                             \
+                                                                  \
+  return profile$output.get_output_string();                      \
 }                                                                 \
                                                                   \
 function profile$nest(loc, fn, enter)                             \
@@ -1190,13 +1243,20 @@ function profile$set_var_div(loc, val)                            \
 }                                                                 \
                                                                   \
 function profile$call_prop(loc, obj, prop)                        \
-{ var f = obj[prop];                                              \
+{ profile$fetch_prop(loc, obj, prop);                             \
+  var f = obj[prop];                                              \
   var args = [];                                                  \
   for (var i=3; i<arguments.length; i++)                          \
     args.push(arguments[i]);                                      \
   return f.apply(obj, args);                                      \
 }                                                                 \
                                                                   \
+function profile$end_of_program()                                 \
+{ if (false)                                                      \
+    print(profile$report());                                      \
+  else                                                            \
+    setTimeout(\"document.write('<pre>'+profile$report()+'</pre>');\", 5000); \
+}                                                                 \
 ";
 
 //-----------------------------------------------------------------------------

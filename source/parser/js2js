@@ -76,9 +76,13 @@ while [ "$1" != "" ]; do
 done
 
 if [ "$OPT_AST" != "" ]; then
-  $JS2JS $OPT_DEBUG $OPT_WARN -ast -nojs $FILES
+  if ! $JS2JS $OPT_DEBUG $OPT_WARN -ast -nojs $FILES; then
+    exit 1
+  fi
 else
-  $JS2JS $OPT_DEBUG $OPT_WARN $FILES < /dev/null > $LAST_FILE.js
+  if ! $JS2JS $OPT_DEBUG $OPT_WARN $FILES < /dev/null > $LAST_FILE.js; then
+    exit 1
+  fi
   if [ "$OPT_JS" == "" ]; then
     cat $LAST_FILE.js
     rm -f $LAST_FILE.js
