@@ -103,7 +103,7 @@ tests.utility.hashMap.consistency = function ()
         keyList.push(i / 2);
         itemList.push(i);
 
-        map.addItem(keyList[i], itemList[i]);
+        map.set(keyList[i], itemList[i]);
     }
 
     for (var repeat = 0; repeat < 10; ++repeat)
@@ -114,9 +114,9 @@ tests.utility.hashMap.consistency = function ()
         {
             var idx = Math.floor(Math.random() * keyList.length);
 
-            map.remItem(keyList[idx]);
+            map.rem(keyList[idx]);
 
-            if (map.hasItem(keyList[idx]))
+            if (map.has(keyList[idx]) === true)
                 error('removed item still in table');
 
             remList.push(itemList[idx]);
@@ -127,10 +127,10 @@ tests.utility.hashMap.consistency = function ()
 
         for (var i = 0; i < keyList.length; ++i)
         {
-            if (!map.hasItem(keyList[i]))
+            if (map.has(keyList[i]) === false)
                 error('item not found in table');
 
-            if (map.getItem(keyList[i]) != itemList[i])
+            if (map.get(keyList[i]) != itemList[i])
                 error('item extracted does not match item inserted');
         }
 
@@ -139,7 +139,7 @@ tests.utility.hashMap.consistency = function ()
             keyList.push(remList[i] / 2);
             itemList.push(remList[i]);
 
-            map.addItem(keyList[keyList.length - 1], itemList[keyList.length - 1]);
+            map.set(keyList[keyList.length - 1], itemList[keyList.length - 1]);
         }
     }
 };
@@ -154,7 +154,7 @@ tests.utility.hashMap.iterator = function ()
     var map = new HashMap();
 
     for (var i = 0; i < input.length; ++i)
-        map.addItem(input[i], input[i]);
+        map.set(input[i], input[i]);
 
     var output = [];
 

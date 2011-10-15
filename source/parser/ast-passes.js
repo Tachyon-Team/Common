@@ -788,8 +788,7 @@ ast_pass3_ctx.prototype.walk_expr = function (ast)
             for (var i = 0; i < ast.params.length; ++i)
             {
                 var symName = ast.params[i].toString();
-
-                newVarMap.addItem(symName, { id:argsObjId, index:i });
+                newVarMap.set(symName, { id:argsObjId, index:i });
             }
         }
         else
@@ -798,8 +797,7 @@ ast_pass3_ctx.prototype.walk_expr = function (ast)
             for (var i = 0; i < ast.params.length; ++i)
             {
                 var symName = ast.params[i].toString();
-                if (newVarMap.hasItem(symName))
-                    newVarMap.remItrm(symName);
+                newVarMap.rem(symName);
             }
         }
 
@@ -819,12 +817,12 @@ ast_pass3_ctx.prototype.walk_expr = function (ast)
         // TODO: eliminate when ids are fixed
         var symName = ast.id.toString();
 
-        // If there is an association for this symbol
-        if (this.varMap.hasItem(symName))
-        {
-            // Get the association
-            var assoc = this.varMap.getItem(symName);
+        // Try to get the association for this symbol
+        var assoc = this.varMap.get(symName);
 
+        // If there is an association for this symbol
+        if (assoc !== HashMap.NOT_FOUND)
+        {
             // Replace the parameter reference by an argument object indexing
             return new OpExpr(
                 ast.loc,
