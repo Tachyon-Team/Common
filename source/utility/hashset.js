@@ -76,7 +76,7 @@ Test if a set contains a value
 */
 HashSet.prototype.has = function (val)
 {
-    return this.hashMap.hasItem(val);
+    return this.hashMap.has(val);
 };
 
 /**
@@ -84,7 +84,7 @@ Add a value to the set
 */
 HashSet.prototype.add = function (val)
 {
-    this.hashMap.setItem(val, val);
+    this.hashMap.set(val, val);
     this.length = this.hashMap.numItems;
     return this;
 };
@@ -108,11 +108,9 @@ Remove a value from the set
 */
 HashSet.prototype.rem = function (val)
 {
-    if (this.hashMap.hasItem(val))
-    {
-        this.hashMap.remItem(val);
-        this.length = this.hashMap.numItems;
-    }
+    this.hashMap.rem(val);
+    this.length = this.hashMap.numItems;
+
     return this;
 };
 
@@ -139,10 +137,7 @@ HashSet.prototype.diff = function (set)
     for (var it = set.hashMap.getItr(); it.valid(); it.next())
     {
         var item = it.get();
-        if (that.hashMap.hasItem(item.key))
-        {
-            that.rem(item.key);
-        }
+        that.rem(item.key);
     };
     
     return this;

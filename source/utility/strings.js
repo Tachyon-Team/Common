@@ -52,6 +52,33 @@ Copyright (c) 2010 Maxime Chevalier-Boisvert, All Rights Reserved
 */
 
 /**
+Produce a string from an array of character codes
+*/
+function strFromChars(chars)
+{
+    const MAX_APPLY_LEN = 65000;
+
+    if (chars.length < MAX_APPLY_LEN)
+        return String.fromCharCode.apply(null, chars);
+
+    var str = '';
+
+    var curIdx = 0;
+
+    while (curIdx < chars.length)
+    {
+        var subChars = chars.slice(curIdx, curIdx + MAX_APPLY_LEN);
+        var subStr = String.fromCharCode.apply(null, subChars);
+
+        str += subStr;
+
+        curIdx += MAX_APPLY_LEN;
+    }
+
+    return str;
+}
+
+/**
 Escape JavaScript strings for output
 */
 function escapeJSString(input)
@@ -145,7 +172,7 @@ function escapeJSString(input)
         }
     }
 
-    return String.fromCharCode.apply(null, chars);
+    return strFromChars(chars);
 }
 
 /**
@@ -210,7 +237,7 @@ function escapeXMLString(input, isHTML)
         }
     }
 
-    return String.fromCharCode.apply(null, chars);
+    return strFromChars(chars);
 }
 
 /**
@@ -245,7 +272,7 @@ function indentText(inputStr, indentStr)
         }
     }
 
-    return String.fromCharCode.apply(null, chars);
+    return strFromChars(chars);
 }
 
 /**
