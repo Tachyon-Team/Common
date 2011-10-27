@@ -661,8 +661,14 @@ Scanner.prototype.parse_number = function ()
 Scanner.prototype.parse_string = function ()
 {
     var start_pos = this.lookahead_pos(0);
-    var chars = [];
+    var chars = new String_output_port("");
     var close = this.lookahead_char(0);
+
+    function add_char(c)
+    {
+        chars.write_char(c);
+    }
+
     this.advance(1);
     for (;;)
     {
@@ -751,13 +757,13 @@ Scanner.prototype.parse_string = function ()
                         c = value;
                     }
                 }
-                chars.push(c);
+                add_char(c);
             }
         }
         else
-            chars.push(c);
+            add_char(c);
     }
-    var str = String.fromCharCode.apply(null,chars);
+    var str = chars.get_output_string();
     return this.valued_token(STRING_CAT, str, start_pos);
 };
 
