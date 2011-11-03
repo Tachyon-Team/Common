@@ -42,24 +42,9 @@
 
 //=============================================================================
 
-// File: "ast-passes.js", Time-stamp: <2011-03-01 13:20:29 feeley>
+// File: "ast-passes.js"
 
-// Copyright (c) 2010 by Marc Feeley, All Rights Reserved.
-
-//=============================================================================
-
-// Utility functions
-
-function get_free_id(postFix, loc)
-{
-    return new Token(
-        IDENT_CAT,
-        ("$tachyon$" + (get_free_id.nextIdNum++) + "$" + postFix),
-        loc
-    );
-}
-
-get_free_id.nextIdNum = 0;
+// Copyright (c) 2010-2011 by Marc Feeley, All Rights Reserved.
 
 //=============================================================================
 
@@ -67,12 +52,7 @@ get_free_id.nextIdNum = 0;
 
 function ast_walk_statement(ast, ctx)
 {
-    if (ast === null)
-    {
-        // no transformation
-        return ast;
-    }
-    else if (ast instanceof Program)
+    if (ast instanceof Program)
     {
         ast.block = ctx.walk_statement(ast.block);
         return ast;
@@ -223,7 +203,12 @@ function ast_walk_statement(ast, ctx)
         ast.expr = ctx.walk_expr(ast.expr);
         return ast;
     }
-   else
+    else if (ast === null)
+    {
+        // no transformation
+        return ast;
+    }
+    else
     {
         //pp(ast);
         error("unknown ast in walk_statement");
@@ -241,12 +226,7 @@ function ast_walk_statements(asts, ctx)
 
 function ast_walk_expr(ast, ctx)
 {
-    if (ast === null)
-    {
-        // no transformation
-        return ast;
-    }
-    else if (ast instanceof OpExpr)
+    if (ast instanceof OpExpr)
     {
         ast.exprs = ast_walk_exprs(ast.exprs, ctx);
         return ast;
@@ -299,6 +279,11 @@ function ast_walk_expr(ast, ctx)
     {
         return ast;
     }
+    else if (ast === null)
+    {
+        // no transformation
+        return ast;
+    }
     else
     {
         //pp(ast);
@@ -315,43 +300,375 @@ function ast_walk_exprs(asts, ctx)
     return asts;
 }
 
-
 //-----------------------------------------------------------------------------
 
-// Pass 1.
+// Simplification pass.
 //
-// Adds profiling code.
+// This pass determines the variables declared in each scope and
+// transforms the AST into a simpler AST:
+//
+//   - transform VariableStatement into assignment
+//   - transform ForVarStatement into ForStatement
+//   - transform ForVarInStatement into ForInStatement
+//   - flattening of nested block statements
+//
+// Variable declarations are made to refer to Variable objects.
 
-function ast_pass1_ctx()
+function Variable(tok, is_param, is_declared, scope)
 {
-    this.fn_decl = null;
+    this.tok         = tok;
+    this.is_param    = is_param;
+    this.is_declared = is_declared;
+    this.scope       = scope;
+    this.special     = false; // can be false, "eval" or "arguments"
 }
 
-
-ast_pass1_ctx.prototype.walk_statement = function (ast)
+Variable.prototype.toString = function ()
 {
-    if (ast === null)
+    return this.tok.toString();
+};
+
+function register_decl(scope, id, is_param)
+{
+    // This function adds the identifier id to the ast node scope.
+    // The id is an instance of Token (with cat=IDENT_CAT) or Variable.
+    // The scope is an instance of Program, FunctionExpr or CatchPart.
+
+    var id_str = id.toString();
+    var v = scope.vars[id_str];
+    if (typeof v === "undefined")
     {
-        // no transformation
-        return ast;
+        v = new Variable((id instanceof Token) ? id : id.tok,
+                         is_param,
+                         true,
+                         scope);
+        scope.vars[id_str] = v;
     }
-    else if (ast instanceof Program)
+    return v;
+};
+
+function simplification_pass_ctx(options, scope)
+{
+    this.options = options;
+    this.scope = scope;
+    this.non_catch_scope = scope; // assume it is not a CatchPart scope
+}
+
+simplification_pass_ctx.prototype.create_ctx = function (ast)
+{
+    ast.vars = {};
+    ast.parent = this.scope;
+    return new simplification_pass_ctx(this.options, ast);
+}
+
+simplification_pass_ctx.prototype.walk_statement = function (ast)
+{
+    if (ast instanceof Program)
     {
-        ast_walk_statement(ast, this);
-        return ast;
+        var new_ctx = this.create_ctx(ast);
+        return ast_walk_statement(ast, new_ctx);
     }
     else if (ast instanceof FunctionDeclaration)
     {
-        var save_fn_decl = this.fn_decl;
-        this.fn_decl = ast;
+        ast.id = register_decl(this.non_catch_scope, ast.id, false);
         ast.funct = this.walk_expr(ast.funct);
-        this.fn_decl = save_fn_decl;
         return ast;
+    }
+    else if (ast instanceof VariableStatement)
+    {
+        var ctx = this;
+        var accum = [];
+        ast.decls.forEach(function (decl, i, self)
+                          {
+                              decl.id = register_decl(ctx.non_catch_scope, decl.id, false);
+                              if (decl.initializer !== null)
+                              {
+                                  decl.initializer = ctx.walk_expr(decl.initializer);
+                                  accum.push(new ExprStatement(
+                                               decl.loc,
+                                               new OpExpr(decl.loc,
+                                                          op2_table[EQUAL_CAT],
+                                                          [new Ref(decl.id.tok.loc,
+                                                                   decl.id.tok),
+                                                           decl.initializer])));
+                              }
+                          });
+        if (accum.length === 1)
+            return accum[0];
+        else
+            return new BlockStatement(ast.loc,
+                                      accum);
+    }
+    else if (ast instanceof ForVarStatement)
+    {
+        var accum = null;
+        for (var i=ast.decls.length-1; i>=0; i--)
+        {
+            var decl = ast.decls[i];
+            decl.id = register_decl(this.non_catch_scope, decl.id, false);
+            if (decl.initializer !== null)
+            {
+                decl.initializer = this.walk_expr(decl.initializer);
+                var init = new OpExpr(decl.loc,
+                                      op2_table[EQUAL_CAT],
+                                      [new Ref(decl.id.tok.loc,
+                                               decl.id.tok),
+                                       decl.initializer]);
+                if (accum === null)
+                    accum = init;
+                else
+                    accum = new OpExpr(decl.loc,
+                                       op2_table[COMMA_CAT],
+                                       [init, accum]);
+            }
+        }
+        ast.expr2 = this.walk_expr(ast.expr2);
+        ast.expr3 = this.walk_expr(ast.expr3);
+        ast.statement = this.walk_statement(ast.statement);
+        return new ForStatement(ast.loc,
+                                accum,
+                                ast.expr2,
+                                ast.expr3,
+                                ast.statement);
+    }
+    else if (ast instanceof ForVarInStatement)
+    {
+        ast.id = register_decl(this.non_catch_scope, ast.id, false);
+        var initializer = this.walk_expr(ast.initializer);
+        var set_expr = this.walk_expr(ast.set_expr);
+        var statement = this.walk_statement(ast.statement);
+        var for_stat = new ForInStatement(ast.loc,
+                                          new Ref(ast.id.tok.loc,
+                                                  ast.id.tok),
+                                          set_expr,
+                                          statement);
+        if (initializer === null)
+            return for_stat;
+        else
+            return new BlockStatement(ast.loc,
+                                      [new ExprStatement(
+                                         initializer.loc,
+                                         new OpExpr(ast.loc,
+                                                    op2_table[EQUAL_CAT],
+                                                    [new Ref(ast.id.tok.loc,
+                                                             ast.id.tok),
+                                                     initializer])),
+                                       for_stat]);
+    }
+    else if (ast instanceof CatchPart)
+    {
+        var new_ctx = this.create_ctx(ast);
+        new_ctx.non_catch_scope = this.non_catch_scope;
+        ast.id = register_decl(ast, ast.id, true);
+        return ast_walk_statement(ast, new_ctx);
+    }
+    else
+        return ast_walk_statement(ast, this);
+};
+
+simplification_pass_ctx.prototype.walk_expr = function (ast)
+{
+    if (ast instanceof FunctionExpr)
+    {
+        var new_ctx = this.create_ctx(ast);
+
+        ast.params.forEach(function (param, i, self)
+                           {
+                               ast.params[i] = register_decl(ast, param, true);
+                           });
+
+/*
+        if (ast.id !== null)
+            ast.id = register_decl(ast, ast.id, false); // TODO: verify that this conforms to ES5
+*/
+
+        return ast_walk_expr(ast, new_ctx);
+    }
+    else
+        return ast_walk_expr(ast, this);
+};
+
+simplification_pass_ctx.prototype.walk_statements = function (asts)
+{
+    var ctx = this;
+    var accum = [];
+    asts.forEach(function (ast, i, asts)
+                 {
+                     var a = ctx.walk_statement(ast);
+                     if (a instanceof BlockStatement)
+                         accum.push(a.statements); // merge embedded blocks
+                     else
+                         accum.push([a]);
+                 });
+    return Array.prototype.concat.apply([], accum);
+};
+
+function simplification_pass(ast, options)
+{
+    var ctx = new simplification_pass_ctx(options, null);
+    ctx.walk_statement(ast);
+}
+
+//-----------------------------------------------------------------------------
+
+// Variable resolution pass.
+//
+// This pass resolves variable references according to their scope.
+// It must follow the simplification pass which determines
+// the set of variables declared in each scope.
+
+function resolve_var(scope, id)
+{
+    var id_str = id.toString();
+
+    while (true)
+    {
+        // Check if id is declared in the current scope
+
+        var v = scope.vars[id_str];
+
+        if (typeof v !== "undefined")
+            return v;
+
+        var parent = scope.parent;
+
+        if (parent === null)
+            break;
+
+        scope = parent;
+    }
+
+    // Search has stopped at the global scope (a Program node)
+
+    v = new Variable(id, false, false, scope);
+
+    scope.vars[id_str] = v;
+
+    return v;
+}
+
+function var_resolution_pass_ctx(options, scope)
+{
+    this.options = options;
+    this.scope = scope;
+    this.non_catch_scope = scope; // assume it is not a CatchPart scope
+}
+
+var_resolution_pass_ctx.prototype.create_ctx = function (ast)
+{
+    return new var_resolution_pass_ctx(this.options, ast);
+}
+
+var_resolution_pass_ctx.prototype.walk_statement = function (ast)
+{
+    if (ast instanceof Program)
+    {
+        var new_ctx = this.create_ctx(ast);
+        ast = ast_walk_statement(ast, new_ctx);
+
+        function set_special(id)
+        {
+            var v = ast.vars[id];
+            if (typeof v !== "undefined")
+                v.special = id;
+        }
+
+        set_special("eval");
+        set_special("arguments");
+
+        return ast;
+    }
+    else if (ast instanceof CatchPart)
+    {
+        var new_ctx = this.create_ctx(ast);
+        new_ctx.non_catch_scope = this.non_catch_scope;
+        return ast_walk_statement(ast, new_ctx);
+    }
+    else
+        return ast_walk_statement(ast, this);
+};
+
+var_resolution_pass_ctx.prototype.walk_expr = function (ast)
+{
+    if (ast instanceof FunctionExpr)
+    {
+        var new_ctx = this.create_ctx(ast);
+        return ast_walk_expr(ast, new_ctx);
+    }
+    else if (ast instanceof Ref)
+    {
+        ast.id = resolve_var(this.scope, ast.id);
+        return ast;
+    }
+    else
+        return ast_walk_expr(ast, this);
+};
+
+function var_resolution_pass(ast, options)
+{
+    var ctx = new var_resolution_pass_ctx(options, null);
+    ctx.walk_statement(ast);
+}
+
+//-----------------------------------------------------------------------------
+
+// Renaming pass.
+//
+// This pass renames the global variables declared in the program so
+// that pretty printing will use those names.  A namespace prefix is
+// added to all global variables declared by the program, except those
+// marked as "exported".
+
+function renaming_pass(ast, options)
+{
+    if (options.namespace !== false)
+    {
+        for (id_str in ast.vars)
+        {
+            var v = ast.vars[id_str];
+            if (v.is_declared && !options.exports[id_str])
+            {
+                var id = v.tok;
+                id.value = options.namespace + id.value;
+            }
+        }
+    }
+}
+
+//-----------------------------------------------------------------------------
+
+// Profiling pass.
+//
+// This pass adds profiling code.
+
+function profiling_pass_ctx(options, prog, fn_decl)
+{
+    this.options = options;
+    this.prog = prog;
+    this.fn_decl = fn_decl;
+}
+
+profiling_pass_ctx.prototype.create_ctx = function (prog, fn_decl)
+{
+    return new profiling_pass_ctx(this.options, prog, fn_decl);
+}
+
+profiling_pass_ctx.prototype.walk_statement = function (ast)
+{
+    if (ast instanceof Program)
+    {
+        var new_ctx = this.create_ctx(ast, null);
+        return ast_walk_statement(ast, new_ctx);
+    }
+    else if (ast instanceof FunctionDeclaration)
+    {
+        var new_ctx = this.create_ctx(this.prog, ast);
+        return ast_walk_statement(ast, new_ctx);
     }
     else if (ast instanceof ReturnStatement)
     {
         ast.expr = this.walk_expr(ast.expr);
-        if (!this.filter_debug(ast))
+        if (!this.filter(ast))
         {
             return ast;
         }
@@ -369,9 +686,7 @@ ast_pass1_ctx.prototype.walk_statement = function (ast)
         }
     }
     else
-    {
         return ast_walk_statement(ast, this);
-    }
 };
 
 function is_ref(a)
@@ -418,14 +733,9 @@ function is_assign_op2(op)
            op === "x %= y";
 }
 
-ast_pass1_ctx.prototype.walk_expr = function (ast)
+profiling_pass_ctx.prototype.walk_expr = function (ast)
 {
-    if (ast === null)
-    {
-        // no transformation
-        return ast;
-    }
-    else if (ast instanceof OpExpr)
+    if (ast instanceof OpExpr)
     {
         var op = ast.op;
 
@@ -505,26 +815,46 @@ ast_pass1_ctx.prototype.walk_expr = function (ast)
     }
     else if (ast instanceof CallExpr)
     {
-        if (is_prop_access(ast.fn))
+        ast.args = ast_walk_exprs(ast.args, this);
+
+        if (ast.fn instanceof Ref &&
+            ast.fn.id.special === "eval")
+        {
+            if (ast.args.length >= 1)
+                ast.args[0] = this.call_hook("profile$instrument_hook",
+                                             ast.loc,
+                                             ast.args[0]);
+            return this.call_hook("profile$EvalExpr_hook",
+                                  ast.loc,
+                                  ast);
+        }
+        else if (is_prop_access(ast.fn))
         {
             return this.call_hook.apply(this,
                                         ["profile$call_prop",
                                          ast.loc,
                                          this.walk_expr(ast.fn.exprs[0]),
                                          this.walk_expr(ast.fn.exprs[1])]
-                                        .concat(ast_walk_exprs(ast.args, this)));
+                                        .concat(ast.args));
         }
+        else
+        {
+            ast.fn = this.walk_expr(ast.fn);
 
-        return this.call_hook("profile$CallExpr_hook",
-                              ast.loc,
-                              ast_walk_expr(ast, this));
+            return this.call_hook("profile$CallExpr_hook",
+                                  ast.loc,
+                                  ast);
+        }
     }
     else if (ast instanceof FunctionExpr)
     {
-        ast_walk_statements(ast.body, this);
+        ast.body = ast_walk_statements(ast.body, this);
 
-        if (this.filter_debug(ast))
+        if (this.filter(ast))
         {
+            var args_tok = new Token(IDENT_CAT, "arguments", ast.loc);
+            var args_var = resolve_var(this.prog, args_tok);
+
             ast.body.unshift(
                 new ExprStatement(ast.loc,
                                   this.call_hook(
@@ -536,13 +866,15 @@ ast_pass1_ctx.prototype.walk_expr = function (ast)
                                                    : "")
                                                   + "(" + ast.params.join() + ")"),
                                       new Ref(ast.loc,
-                                              new Token(IDENT_CAT, "arguments", ast.loc)))));
+                                              args_var))));
+
             ast.body.push(new ExprStatement(ast.loc,
                                             this.call_hook("profile$return0",
                                                            ast.loc)));
         }
 
-        return ast;
+        return ast;///////////////////////// why are we exiting prematurely?
+
         return this.call_hook("profile$FunctionExpr_hook",
                               ast.loc,
                               ast);
@@ -591,28 +923,29 @@ ast_pass1_ctx.prototype.walk_expr = function (ast)
                               ast_walk_expr(ast, this));
     }
     else
-    {
         return ast_walk_expr(ast, this);
-    }
 };
 
-ast_pass1_ctx.prototype.call_hook = function (fn, loc)
+profiling_pass_ctx.prototype.call_hook = function (fn, loc)
 {
     var args = [new Literal(loc,
                             loc.to_string())];
 
     for (i=2; i<arguments.length; i++)
         args.push(arguments[i]);
-                    
+
+    var fn_tok = new Token(IDENT_CAT, fn, loc);
+    var fn_var = resolve_var(this.prog, fn_tok);
+
     return new CallExpr(loc,
-                        new Ref(loc,
-                                new Token(IDENT_CAT, fn, loc)),
+                        new Ref(loc, fn_var),
                         args);
 };
 
-ast_pass1_ctx.prototype.filter_debug = function (ast)
+profiling_pass_ctx.prototype.filter = function (ast)
 {
-    // TODO: This filtering should be user configurable from a command line option.
+    // TODO: This filtering should be user configurable from a
+    // command line option.
     if (ast.loc.filename === "parser/parser.js" ||
         ast.loc.filename === "parser/scanner.js" ||
 //        ast.loc.filename === "utility/debug.js" ||
@@ -622,628 +955,33 @@ ast_pass1_ctx.prototype.filter_debug = function (ast)
     return true;
 };
 
-function ast_pass1(ast)
+function profiling_pass(ast, options)
 {
-    var ctx = new ast_pass1_ctx();
-    ctx.walk_statement(ast);
+    if (options.profile)
+    {
+        var ctx = new profiling_pass_ctx(options, null, null);
+        ctx.walk_statement(ast);
+    }
 }
 
 //-----------------------------------------------------------------------------
 
-// Pass 2.
-//
-// Identifies functions that use the "eval" and "arguments" symbols.
-//
-// NOTE: this is not done through free variables for two reasons:
-// 1. Free variables can come from nested sub-functions.
-// 2. Free variable resolution and must be done after pass 2
-
-function ast_pass2_ctx(ast)
+function ast_normalize(ast, options)
 {
-    this.ast = ast;
-}
-
-ast_pass2_ctx.prototype.walk_statement = function (ast)
-{
-    if (ast === null)
-    {
-        // no transformation
-        return ast;
-    }
-    else
-    {
-        return ast_walk_statement(ast, this);
-    }
-};
-
-ast_pass2_ctx.prototype.walk_expr = function (ast)
-{
-    if (ast === null)
-    {
-        // no transformation
-        return ast;
-    }
-
-    // Function expression
-    else if (ast instanceof FunctionExpr)
-    {
-        // Create a new context to traverse the function body
-        var new_ctx = new ast_pass2_ctx(ast);
-
-        // Traverse the function body
-        ast_walk_statements(ast.body, new_ctx);
-
-        // Return the updated function
-        return ast;
-    }
-
-    // Variable reference
-    else if (ast instanceof Ref)
-    {
-        // TODO: eliminate when ids are fixed
-        var symName = ast.id.toString();
-
-        if (symName === "arguments")
-            this.ast.usesArguments = true;
-
-        else if (symName === "eval")
-            this.ast.usesEval = true;
-
-        return ast;
-    }
-
-    else
-    {
-        return ast_walk_expr(ast, this);
-    }
-};
-
-function ast_pass2(ast)
-{
-    var ctx = new ast_pass2_ctx(ast);
-    ctx.walk_statement(ast);
-}
-
-//-----------------------------------------------------------------------------
-
-// Pass 3.
-//
-// Transforms an AST into which, when the arguments name occurs free, references
-// to formal parameters become references to an alias of the arguments object
-
-function ast_pass3_ctx(varMap)
-{
-    // Map function parameters names/ids to pairs argObj/index or nothing
-    this.varMap = varMap;
-}
-
-ast_pass3_ctx.prototype.walk_statement = function (ast)
-{
-    if (ast === null)
-    {
-        // no transformation
-        return ast;
-    }
-    else
-    {
-        return ast_walk_statement(ast, this);
-    }
-};
-
-ast_pass3_ctx.prototype.walk_expr = function (ast)
-{
-    if (ast === null)
-    {
-        // no transformation
-        return ast;
-    }
-
-    // Function expression
-    else if (ast instanceof FunctionExpr)
-    {
-        // Create a copy of the
-        var newVarMap = this.varMap.copy();
-
-        // If the arguments object may be used
-        if (ast.usesArguments)
-        {
-            // Get a free id for the arguments object alias
-            var argsObjId = get_free_id("argsObj", ast.loc);
-
-            // Create the arguments object alias in the function body
-            ast.body.unshift(
-                new VariableStatement(
-                    ast.loc,
-                    [
-                        new Decl(
-                            ast.loc,
-                            argsObjId,
-                            new Ref(ast.loc,
-                                    new Token(IDENT_CAT, "arguments", ast.loc))
-                        )
-                    ]
-                )
-            );
-
-            // For each function parameter
-            for (var i = 0; i < ast.params.length; ++i)
-            {
-                var symName = ast.params[i].toString();
-                newVarMap.set(symName, { id:argsObjId, index:i });
-            }
-        }
-        else
-        {
-            // The parameters of the function are not associated
-            for (var i = 0; i < ast.params.length; ++i)
-            {
-                var symName = ast.params[i].toString();
-                newVarMap.rem(symName);
-            }
-        }
-
-        // Create a new context to traverse the function body
-        var new_ctx = new ast_pass3_ctx(newVarMap);
-
-        // Traverse and update the function body
-        ast.body = ast_walk_statements(ast.body, new_ctx);
-
-        // Return the updated function
-        return ast;
-    }
-
-    // Variable reference
-    else if (ast instanceof Ref)
-    {
-        // TODO: eliminate when ids are fixed
-        var symName = ast.id.toString();
-
-        // Try to get the association for this symbol
-        var assoc = this.varMap.get(symName);
-
-        // If there is an association for this symbol
-        if (assoc !== HashMap.NOT_FOUND)
-        {
-            // Replace the parameter reference by an argument object indexing
-            return new OpExpr(
-                ast.loc,
-                "x [ y ]",
-                [
-                    new Ref(ast.loc, assoc.id),
-                    new Literal(ast.loc, assoc.index)
-                ]
-            );
-        }
-        else
-        {
-            return ast;
-        }
-    }
-
-    else
-    {
-        return ast_walk_expr(ast, this);
-    }
-};
-
-function ast_pass3(ast)
-{
-    var ctx = new ast_pass3_ctx(new HashMap());
-    ctx.walk_statement(ast);
-}
-
-//-----------------------------------------------------------------------------
-
-// Pass 4.
-//
-// Transforms an AST into a simpler AST.
-//
-//   - transform "VariableStatement" into assignment
-//   - transform "ForVarStatement" into "ForStatement"
-//   - transform "ForVarInStatement" into "ForInStatement"
-//   - flattening of nested block statements
-
-function ast_pass4_ctx(vars, scope)
-{
-    this.vars = vars;
-    this.scope = scope;
-}
-
-function ast_pass4_empty_ctx(scope)
-{
-    return new ast_pass4_ctx({}, scope);
-}
-
-function ast_Variable(id, is_param, scope)
-{
-    this.id       = id;
-    this.is_param = is_param;
-    this.scope    = scope;
-}
-
-ast_Variable.prototype.toString = function ()
-{
-    return this.id.toString();
-};
-
-ast_pass4_ctx.prototype.function_ctx = function (ast)
-{
-    var new_ctx = ast_pass4_empty_ctx(ast);
-    ast.params.forEach(function (param, i, self)
-                       {
-                           new_ctx.add_variable(param, true);
-                       });
-    return new_ctx;
-};
-
-ast_pass4_ctx.prototype.catch_ctx = function (ast)
-{
-    var new_ctx = ast_pass4_empty_ctx(ast);
-    new_ctx.add_variable(ast.id, true);
-/*
-    [new Decl(IDENT.loc.join(Initializer.loc),
-                     IDENT,
-                     Initializer)]
-*/
-    return new_ctx;
-};
-
-ast_pass4_ctx.prototype.add_variable = function (id, is_param)
-{
-    var id_str = id.value;
-    var v = this.vars[id_str];
-    if (typeof v === "undefined")
-    {
-        v = new ast_Variable(id, is_param, this.scope);
-        this.vars[id_str] = v;
-    }
-    return v;
-};
-
-ast_pass4_ctx.prototype.walk_statement = function (ast)
-{
-    if (ast === null)
-    {
-        // no transformation
-        return ast;
-    }
-    else if (ast instanceof Program)
-    {
-        var new_ctx = ast_pass4_empty_ctx(ast);
-        ast.block = new_ctx.walk_statement(ast.block);
-        ast.vars = new_ctx.vars;
-        return ast;
-    }
-    else if (ast instanceof FunctionDeclaration)
-    {
-        this.add_variable(ast.id, false);
-        ast.funct = this.walk_expr(ast.funct);
-        return ast;
-    }
-    else if (ast instanceof VariableStatement)
-    {
-        var ctx = this;
-        var accum = [];
-        ast.decls.forEach(function (decl, i, self)
-                          {
-                              ctx.add_variable(decl.id, false);
-                              if (decl.initializer !== null)
-                              {
-                                  decl.initializer = ctx.walk_expr(decl.initializer);
-                                  accum.push(new ExprStatement(
-                                               decl.loc,
-                                               new OpExpr(decl.loc,
-                                                          op2_table[EQUAL_CAT],
-                                                          [new Ref(decl.id.loc,
-                                                                   decl.id),
-                                                           decl.initializer])));
-                              }
-                          });
-        if (accum.length === 1)
-            return accum[0];
-        else
-            return new BlockStatement(ast.loc,
-                                      accum);
-    }
-    else if (ast instanceof ForVarStatement)
-    {
-        var accum = null;
-        for (var i=ast.decls.length-1; i>=0; i--)
-        {
-            var decl = ast.decls[i];
-            this.add_variable(decl.id, false);
-            if (decl.initializer !== null)
-            {
-                decl.initializer = this.walk_expr(decl.initializer);
-                var init = new OpExpr(decl.loc,
-                                      op2_table[EQUAL_CAT],
-                                      [new Ref(decl.id.loc,
-                                               decl.id),
-                                       decl.initializer]);
-                if (accum === null)
-                    accum = init;
-                else
-                    accum = new OpExpr(decl.loc,
-                                       op2_table[COMMA_CAT],
-                                       [init, accum]);
-            }
-        }
-        ast.expr2 = this.walk_expr(ast.expr2);
-        ast.expr3 = this.walk_expr(ast.expr3);
-        ast.statement = this.walk_statement(ast.statement);
-        return new ForStatement(ast.loc,
-                                accum,
-                                ast.expr2,
-                                ast.expr3,
-                                ast.statement);
-    }
-    else if (ast instanceof ForVarInStatement)
-    {
-        this.add_variable(ast.id, false);
-        var initializer = this.walk_expr(ast.initializer);
-        var set_expr = this.walk_expr(ast.set_expr);
-        var statement = this.walk_statement(ast.statement);
-        var for_stat = new ForInStatement(ast.loc,
-                                          new Ref(ast.id.loc,
-                                                  ast.id),
-                                          set_expr,
-                                          statement);
-        if (initializer === null)
-            return for_stat;
-        else
-            return new BlockStatement(ast.loc,
-                                      [new ExprStatement(
-                                         initializer.loc,
-                                         new OpExpr(ast.loc,
-                                                    op2_table[EQUAL_CAT],
-                                                    [new Ref(ast.id.loc,
-                                                             ast.id),
-                                                     initializer])),
-                                       for_stat]);
-    }
-    else if (ast instanceof CatchPart)
-    {
-        var new_ctx = this.catch_ctx(ast);
-        ast.statement = new_ctx.walk_statement(ast.statement);
-        ast.vars = new_ctx.vars;
-        ast.parent = this.scope;
-        return ast;
-    }
-    else
-        return ast_walk_statement(ast, this);
-};
-
-ast_pass4_ctx.prototype.walk_expr = function (ast)
-{
-    if (ast === null)
-    {
-        // no transformation
-        return ast;
-    }
-    else if (ast instanceof FunctionExpr)
-    {
-        var new_ctx = this.function_ctx(ast);
-        if (ast.id !== null)
-            new_ctx.add_variable(ast.id, false);
-        ast.body = new_ctx.walk_statements(ast.body);
-        ast.vars = new_ctx.vars;
-        ast.parent = this.scope;
-        return ast;
-    }
-    else
-    {
-        return ast_walk_expr(ast, this);
-    }
-};
-
-ast_pass4_ctx.prototype.walk_statements = function (asts)
-{
-    var ctx = this;
-    var accum = [];
-    asts.forEach(function (ast, i, asts)
-                 {
-                     var a = ctx.walk_statement(ast);
-                     if (a instanceof BlockStatement)
-                         accum.push(a.statements); // merge embedded blocks
-                     else
-                         accum.push([a]);
-                 });
-    return Array.prototype.concat.apply([], accum);
-};
-
-function ast_pass4(ast)
-{
-    var ctx = ast_pass4_empty_ctx(null);
-    ctx.walk_statement(ast);
-}
-
-//-----------------------------------------------------------------------------
-
-// Pass 5.
-//
-// Transforms an AST into an AST in which
-//
-//   - variables are resolved according to their scope
-//   - a map of escaping variables is added to functions
-//   - a map of closure-provided variables is added to functions
-//   - a list of all nested functions is added to functions
-
-function ast_pass5_ctx(scope)
-{
-    this.scope = scope;
-}
-
-ast_pass5_ctx.prototype.function_ctx = function (ast)
-{
-    var new_ctx = new ast_pass5_ctx(ast);
-
-    ast.params.forEach(
-        function (param, i, self)
-        {
-            param[i] = new_ctx.resolve_variable(param);
-        }
-    );
-
-    return new_ctx;
-};
-
-ast_pass5_ctx.prototype.catch_ctx = function (ast)
-{
-    var new_ctx = new ast_pass5_ctx(ast);
-
-    ast.id = new_ctx.resolve_variable(ast.id);
-
-    return new_ctx;
-};
-
-ast_pass5_ctx.prototype.resolve_variable = function (id)
-{
-    // Where is this id declared???
-
-    function resolve(scope)
-    {
-        var id_str = id.value;
-
-        // If the id is declared in the current scope
-        var v = scope.vars[id_str];
-        if (typeof v !== "undefined")
-            return v;
-
-        // If the id is a free variable of the current scope
-        v = scope.free_vars[id_str];
-        if (typeof v !== "undefined")
-            return v;
-
-        // If the current scope is global
-        if (scope instanceof Program)
-            v = new ast_Variable(id, false, scope);
-        else
-            v = resolve(scope.parent);
-
-        if (!(scope instanceof CatchPart))
-        {
-            // This variable is declared in an enclosing scope, add it to the free variable list of the current scope
-            scope.free_vars[id_str] = v;
-
-            // If this is not a global variable, add it to the closure variable list of the current scope
-            // TODO: the computation of clos_vars should be done elsewhere as it is not related to the semantics
-            if (!(v.scope instanceof Program))
-                scope.clos_vars[id_str] = v;
-        }
-
-        // If the variable's scope is a function and does not match the current scope, mark
-        // the variable as escaping in its scope of origin
-        if (v.scope instanceof FunctionExpr && v.scope !== scope)
-            v.scope.esc_vars[id_str] = v;
-
-        return v;
-    }
-
-    return resolve(this.scope);
-};
-
-ast_pass5_ctx.prototype.walk_statement = function (ast)
-{
-    if (ast === null)
-    {
-        // no transformation
-        return ast;
-    }
-    else if (ast instanceof Program)
-    {
-        ast.free_vars = {};
-        ast.funcs = [];
-
-        var new_ctx = new ast_pass5_ctx(ast);
-        ast.block = new_ctx.walk_statement(ast.block);
-        return ast;
-    }
-    else if (ast instanceof FunctionDeclaration)
-    {
-        // Set the current function declaration
-        this.func_decl = ast;
-
-        ast.id = this.resolve_variable(ast.id);
-        ast.funct = this.walk_expr(ast.funct);
-
-        return ast;
-    }
-    else if (ast instanceof CatchPart)
-    {
-        ast.free_vars = {};
-
-        // TODO
-        //var new_ctx = this.catch_ctx(ast);
-        var new_ctx = this;
-
-        ast.statement = new_ctx.walk_statement(ast.statement);
-        return ast;
-    }
-    else
-    {
-        return ast_walk_statement(ast, this);
-    }
-};
-
-ast_pass5_ctx.prototype.walk_expr = function (ast)
-{
-    if (ast === null)
-    {
-        // no transformation
-        return ast;
-    }
-    else if (ast instanceof FunctionExpr)
-    {
-        ast.free_vars = {};
-        ast.clos_vars = {};
-        ast.esc_vars = {};
-        ast.funcs = [];
-
-        // Add this function to the scope's nested function list
-        // If this function is part of a function declaration, add the declaration instead
-        // TODO: fix this code which does not work when the scope is for a CatchPart
-        if (this.func_decl !== undefined && this.func_decl.funct === ast)
-            this.scope.funcs.push(this.func_decl);
-        else
-            this.scope.funcs.push(ast);
-
-        var new_ctx = this.function_ctx(ast);
-
-        if (ast.id !== null)
-            ast.id = new_ctx.resolve_variable(ast.id);
-
-        ast.body = ast_walk_statements(ast.body, new_ctx);
-
-        return ast;
-    }
-    else if (ast instanceof Ref)
-    {
-        ast.id = this.resolve_variable(ast.id);
-        return ast;
-    }
-    else
-    {
-        return ast_walk_expr(ast, this);
-    }
-};
-
-function ast_pass5(ast)
-{
-    var ctx = new ast_pass5_ctx(ast);
-    ctx.walk_statement(ast);
-}
-
-//-----------------------------------------------------------------------------
-
-function ast_normalize(ast, debug)
-{
-    if (debug)
-        ast_pass1(ast);
-    else
-        ast_pass2(ast);
-    ast_pass3(ast);
-    ast_pass4(ast);
-    ast_pass5(ast);
+    if (options === true || options === false) // support old interface
+        options = { profile: false,
+                    namespace: false,
+                    exports: {},
+                    debug: options,
+                    warn: false,
+                    ast: false,
+                    nojs: false
+                  };
+
+    simplification_pass(ast, options);
+    var_resolution_pass(ast, options);
+    profiling_pass(ast, options);
+    renaming_pass(ast, options);
 
     return ast;
 }

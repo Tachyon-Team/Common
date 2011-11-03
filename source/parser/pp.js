@@ -42,9 +42,9 @@
 
 //=============================================================================
 
-// File: "pp.js", Time-stamp: <2011-03-15 13:47:52 feeley>
+// File: "pp.js"
 
-// Copyright (c) 2010 by Marc Feeley, All Rights Reserved.
+// Copyright (c) 2010-2011 by Marc Feeley, All Rights Reserved.
 
 //=============================================================================
 
@@ -69,6 +69,7 @@ function pp_indent(ast, indent)
                 pp_id(ast.vars[v], indent, "var");
         }
 
+/*
         if (ast.free_vars !== null)
         {
             for (var v in ast.free_vars)
@@ -85,6 +86,7 @@ function pp_indent(ast, indent)
                     print(pp_prefix(indent) + "|-func anonymous");
             }
         }
+*/
 
         pp_asts(indent, "block", [ast.block]);
     }
@@ -226,10 +228,7 @@ function pp_indent(ast, indent)
     else if (ast instanceof CatchPart)
     {
         pp_loc(ast.loc, pp_prefix(indent) + "CatchPart");
-
-        // TODO: temporary fix until catch scope issues are fixed
-        //pp_id(ast.id, indent, "id");
-
+        pp_id(ast.id, indent, "id");
         pp_asts(indent, "statement", [ast.statement]);
     }
     else if (ast instanceof DebuggerStatement)
@@ -262,7 +261,7 @@ function pp_indent(ast, indent)
             pp_id(ast.id, indent, "id");
 
         for (var p in ast.params)
-            pp_loc(ast.params[p].loc, pp_prefix(indent) + "|-param= " + ast.params[p].toString());
+            pp_id(ast.params[p], indent, "param");
 
         for (var a in ast.annotations)
             pp_loc(ast.annotations[a].loc, pp_prefix(indent) + "|-annotation= \"" + ast.annotations[a].value + "\"");
@@ -273,22 +272,11 @@ function pp_indent(ast, indent)
                 pp_id(ast.vars[v], indent, "var");
         }
 
+/*
         if (ast.free_vars !== null)
         {
             for (var v in ast.free_vars)
                 pp_id(ast.free_vars[v], indent, "free_var");
-        }
-
-        if (ast.clos_vars !== null)
-        {
-            for (var v in ast.clos_vars)
-                pp_id(ast.clos_vars[v], indent, "clos_var");
-        }
-
-        if (ast.esc_vars !== null)
-        {
-            for (var v in ast.esc_vars)
-                pp_id(ast.esc_vars[v], indent, "esc_var");
         }
 
         if (ast.funcs !== null)
@@ -301,6 +289,7 @@ function pp_indent(ast, indent)
                     print(pp_prefix(indent) + "|-func anonymous");
             }
         }
+*/
 
         pp_asts(indent, "body", ast.body);
     }
@@ -340,16 +329,27 @@ function pp_indent(ast, indent)
 
 function pp_id(id, indent, label)
 {
-    var kind = "[unknown]";
+    if (id instanceof Token)
+    {
+        print("xxxxxxxxxx TOKEN");/////////////////////////
+        pp_loc(id.loc, pp_prefix(indent) + "|-" + label + "= " + id.toString());
+    }
+    else
+    {
+        var kind = "unknown";
 
-    if (id.scope instanceof Program)
-        kind = "[global]";
-    else if (id.scope instanceof FunctionExpr)
-        kind = "[local]";
-    else if (id.scope instanceof CatchPart)
-        kind = "[catch]";
+        if (id.scope instanceof Program)
+            kind = "global";
+        else if (id.scope instanceof FunctionExpr)
+            kind = "local";
+        else if (id.scope instanceof CatchPart)
+            kind = "catch";
 
-    pp_loc(id.scope.loc, pp_prefix(indent) + "|-" + label + "= " + id.toString() + " " + kind);
+        if (id.used_free)
+            kind += ",used_free";
+
+        pp_loc(id.scope.loc, pp_prefix(indent) + "|-" + label + "= " + id.toString() + " [" + kind + "]");
+    }
 }
 
 function pp_loc(loc, line)
@@ -440,8 +440,12 @@ function ast_to_js(ast, ctx)
         error("null ast");
     else if (ast instanceof Program)
     {
-        for (var v in ast.vars)
-            js_var(js_id_to_js(v), ctx);
+        for (var id_str in ast.vars)
+        {
+            var v = ast.vars[id_str];
+            if (v.is_declared)
+                js_var(js_id_to_js(v.toString()), ctx);
+        }
         ast_to_js(ast.block, ctx);
     }
     else if (ast instanceof BlockStatement)
@@ -864,7 +868,12 @@ function ast_to_js(ast, ctx)
         js_out("this", ctx);
     }
     else
+    {
+        print(ast instanceof VariableStatement);////////////////////////
+        for (var k in ast)
+            print(k);
         error("UNKNOWN AST");
+    }
 }
 
 function function_to_js(ast, id, ctx)

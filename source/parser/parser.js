@@ -42,9 +42,9 @@
 
 //=============================================================================
 
-// File: "parser.js", Time-stamp: <2011-03-15 13:40:21 feeley>
+// File: "parser.js"
 
-// Copyright (c) 2010 by Marc Feeley, All Rights Reserved.
+// Copyright (c) 2010-2011 by Marc Feeley, All Rights Reserved.
 
 //=============================================================================
 
@@ -452,8 +452,6 @@ function Program(loc, block)
     this.vars = null;
     this.free_vars = null;
     this.block = block;
-    this.usesArguments = false;
-    this.usesEval = false;
 }
 
 function FunctionDeclaration(loc, id, funct)
@@ -739,8 +737,6 @@ function FunctionExpr(loc, id, params, body)
     this.params = params;
     this.body = body;
     this.annotations = extract_annotations(body);
-    this.usesArguments = false;
-    this.usesEval = false;
 }
 
 function extract_annotations(body)

@@ -42,9 +42,9 @@
 
 //=============================================================================
 
-// File: "js2js.js", Time-stamp: <2010-12-31 11:40:11 feeley>
+// File: "js2js.js"
 
-// Copyright (c) 2010 by Marc Feeley, All Rights Reserved.
+// Copyright (c) 2010-2011 by Marc Feeley, All Rights Reserved.
 
 //=============================================================================
 
@@ -53,22 +53,32 @@ function main()
     var args = command_line();
     var statements = [];
     var prog = null;
-    var opt_debug = false;
-    var opt_warn = false;
-    var opt_ast = false;
-    var opt_nojs = false;
+    var options = { profile: false,
+                    namespace: false,
+                    exports: {},
+                    debug: false,
+                    warn: false,
+                    ast: false,
+                    nojs: false
+                  };
     var i = 0;
 
     while (i < args.length)
     {
-        if (args[i] === "-debug")
-            opt_debug = true;
+        if (args[i] === "-profile")
+            options.profile = true;
+        else if (args[i] === "-namespace")
+            options.namespace = args[++i];
+        else if (args[i] === "-export")
+            options.exports[args[++i]] = true;
+        else if (args[i] === "-debug")
+            options.debug = true;
         else if (args[i] === "-warn")
-            opt_warn = true;
+            options.warn = true;
         else if (args[i] === "-ast")
-            opt_ast = true;
+            options.ast = true;
         else if (args[i] === "-nojs")
-            opt_nojs = true;
+            options.nojs = true;
         else
             break;
         i++;
@@ -79,7 +89,7 @@ function main()
         var filename = args[i];
         var port = new File_input_port(filename);
         var s = new Scanner(port);
-        var p = new Parser(s, opt_warn);
+        var p = new Parser(s, options.warn);
         prog = p.parse();
         statements.push(prog.block.statements);
         i++;
@@ -91,12 +101,12 @@ function main()
                            new BlockStatement(prog.loc,
                                               Array.prototype.concat.apply([], statements)));
 
-        var normalized_prog = ast_normalize(prog, opt_debug);
+        var normalized_prog = ast_normalize(prog, options);
 
-        if (opt_ast)
+        if (options.ast)
             pp(normalized_prog);
 
-        if (!opt_nojs)
+        if (!options.nojs)
             js_pp(normalized_prog);
     }
 }

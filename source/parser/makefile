@@ -52,7 +52,8 @@
 
 GRAMMAR=Grammar
 
-all: test-parser
+all: js2js-lib.js
+	#test-parser
 
 test-compiler: misc.js scanner.js parser.js scheme.js js.js
 	./js2scm -exe t.js
@@ -96,19 +97,8 @@ scanner.js: scanner-tables.js
 parser-tables.js: $(GRAMMAR).y.js
 	sed -n '/var action_table =/,$$p' $(GRAMMAR).y.js > parser-tables.js
 
-parser.js: parser-tables.js
-	sed -e '/START-OF-PARSER-TABLES/q' parser.js > part1.js
-	sed -n '/END-OF-PARSER-TABLES/,$$p' parser.js > part2.js
-	cat part1.js parser-tables.js part2.js > parser.js.new
-	if ! diff parser.js.new parser.js > /dev/null; then \
-	  for f in @*parser.js; do \
-	    echo mv $$f @$$f; \
-	    mv $$f @$$f; \
-	  done; \
-	  mv parser.js @parser.js; \
-	fi
-	mv parser.js.new parser.js
-	rm -f part1.js part2.js
+js2js-lib.js: ../utility/debug.js ../utility/system.js ../utility/hashmap.js ../utility/num.js misc.js scanner.js parser.js pp.js ast-passes.js
+	./js2js -namespace "js2js$$" ../utility/debug.js ../utility/system.js ../utility/hashmap.js ../utility/num.js misc.js scanner.js parser.js pp.js ast-passes.js > js2js-lib.js
 
 bootstrap:
 	time ./js2scm -exe ../utility/debug.js ../utility/system.js ../utility/hashmap.js ../utility/num.js misc.js scanner.js parser.js pp.js ast-passes.js js.js

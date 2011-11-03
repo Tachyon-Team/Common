@@ -50,7 +50,6 @@ var profile$stack = [];
 var profile$object_infos = [];
 var profile$fn_abstypes = {};
 var profile$prop_access_abstypes = {};
-var profile$access_counter = 0;
 var profile$fetch_counter = 0;
 var profile$store_counter = 0;
 var profile$obj_counter = 0;
@@ -395,7 +394,6 @@ function profile$report()
     profile$output = new profile$String_output_port();
 
     profile$print("--------------------------- TYPE PROFILE");
-    profile$print("access_counter = " + profile$access_counter);
     profile$print("fetch_counter = " + profile$fetch_counter);
     profile$print("store_counter = " + profile$store_counter);
     profile$print("obj_counter = " + profile$obj_counter);
@@ -518,11 +516,33 @@ function profile$This_hook(loc, val)
     return val;
 }
 
+function profile$EvalExpr_hook(loc, val)
+{
+    return val;
+}
+
+function profile$instrument_hook(loc, expr)
+{
+    var options = { profile: true,
+                    namespace: false,
+                    exports: {},
+                    debug: false,
+                    warn: false,
+                    ast: false,
+                    nojs: false
+                  };
+
+    var port = new js2js$String_input_port(expr + "\n", "<eval at " + loc + ">");
+    var s = new js2js$Scanner(port);
+    var p = new js2js$Parser(s, options.warn);
+    var prog = p.parse();
+    var normalized_prog = js2js$ast_normalize(prog, options);
+
+    return js2js$js_to_string(normalized_prog);
+}
+
 function profile$access_prop_tp(loc, obj)
 {
-    profile$access_counter++;
-    if (profile$access_counter === 1000)
-        profile$dump();
     var descr = profile$prop_access_abstypes[loc];
     if (descr === undefined)
     { descr = { loc: loc,
@@ -804,7 +824,8 @@ function profile$send_output(text)
 
 function profile$dump()
 {
-    profile$send_output("<pre>"+profile$report()+"</pre>");
+//    profile$send_output("<pre>"+profile$report()+"</pre>");
+    print(profile$report());
 }
 
-setTimeout("profile$dump();", 5000);
+//setTimeout(profile$dump, 5000); // dump after 5 seconds

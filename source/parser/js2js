@@ -42,6 +42,9 @@
 # _________________________________________________________________________
 
 
+OPT_PROFILE=""
+OPT_NAMESPACE=""
+OPT_EXPORTS=""
 OPT_DEBUG=""
 OPT_WARN=""
 OPT_AST=""
@@ -59,6 +62,11 @@ JS2JS="d8 $DIR/../utility/debug.js $DIR/../utility/system.js $DIR/../utility/has
 
 while [ "$1" != "" ]; do
   case "$1" in
+    "-profile") OPT_PROFILE="-profile" ;;
+  "-namespace") shift
+                OPT_NAMESPACE="-namespace $1" ;;
+     "-export") shift
+                OPT_EXPORTS="$OPT_EXPORTS -export $1" ;;
       "-debug") OPT_DEBUG="-debug" ;;
        "-warn") OPT_WARN="-warn" ;;
         "-ast") OPT_AST="-ast" ;;
@@ -68,7 +76,7 @@ while [ "$1" != "" ]; do
           *.js) LAST_FILE="$1"
                 FILES="$FILES $LAST_FILE"
                 ;;
-             *) echo "Usage: $0 [-ast|-js] file1.js file2.js ..."
+             *) echo "Usage: $0 [-profile|-namespace <ns>|-export <id>|-debug|-warn|-ast|-js] file1.js file2.js ..."
                 exit 1
                 ;;
   esac
@@ -76,15 +84,17 @@ while [ "$1" != "" ]; do
 done
 
 if [ "$OPT_AST" != "" ]; then
-  if ! $JS2JS $OPT_DEBUG $OPT_WARN -ast -nojs $FILES; then
+  if ! $JS2JS $OPT_PROFILE $OPT_NAMESPACE $OPT_EXPORTS $OPT_DEBUG $OPT_WARN -ast -nojs $FILES; then
     exit 1
   fi
 else
-  if ! $JS2JS $OPT_DEBUG $OPT_WARN $FILES < /dev/null > $LAST_FILE.js; then
+  if ! $JS2JS $OPT_PROFILE $OPT_NAMESPACE $OPT_EXPORTS $OPT_DEBUG $OPT_WARN $FILES < /dev/null > $LAST_FILE.js; then
+    cat "$LAST_FILE.js"
+    rm -f "$LAST_FILE.js"
     exit 1
   fi
   if [ "$OPT_JS" == "" ]; then
-    cat $LAST_FILE.js
-    rm -f $LAST_FILE.js
+    cat "$LAST_FILE.js"
+    rm -f "$LAST_FILE.js"
   fi
 fi
