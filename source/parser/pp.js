@@ -838,7 +838,8 @@ function ast_to_js(ast, ctx)
         for (var i=0; i<ast.exprs.length; i++)
         {
             js_out(sep, ctx);
-            ast_to_js(ast.exprs[i], ctx);
+            if (ast.exprs[i] !== null)
+                ast_to_js(ast.exprs[i], ctx);
             sep = ", ";
         }
         js_out("]", ctx);
