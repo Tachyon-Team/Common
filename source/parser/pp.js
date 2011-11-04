@@ -331,7 +331,6 @@ function pp_id(id, indent, label)
 {
     if (id instanceof Token)
     {
-        print("xxxxxxxxxx TOKEN");/////////////////////////
         pp_loc(id.loc, pp_prefix(indent) + "|-" + label + "= " + id.toString());
     }
     else
@@ -344,9 +343,6 @@ function pp_id(id, indent, label)
             kind = "local";
         else if (id.scope instanceof CatchPart)
             kind = "catch";
-
-        if (id.used_free)
-            kind += ",used_free";
 
         pp_loc(id.scope.loc, pp_prefix(indent) + "|-" + label + "= " + id.toString() + " [" + kind + "]");
     }
@@ -671,9 +667,15 @@ function ast_to_js(ast, ctx)
         js_indent(ctx);
         js_out(ast.label.toString() + ":\n", ctx);
 
+        js_indent(ctx);
+        js_out("{\n", ctx);
         js_indent_begin(ctx);
+
         ast_to_js(ast.statement, ctx);
+
         js_indent_end(ctx);
+        js_indent(ctx);
+        js_out("}\n", ctx);
     }
     else if (ast instanceof ThrowStatement)
     {
@@ -823,6 +825,8 @@ function ast_to_js(ast, ctx)
             str = "null";
         else if (typeof val === "string")
             str = js_unparse_string(val);
+        else if (num_instance(val))
+            str = num_to_string(val, 10);
         else
             str = ast.value.toString();
         js_out(str, ctx);
@@ -855,9 +859,7 @@ function ast_to_js(ast, ctx)
     }
     else if (ast instanceof RegExpLiteral)
     {
-        js_out("/", ctx);
-        js_out(ast.pattern, ctx);
-        js_out("/", ctx);
+        js_out(ast.regexp, ctx);
     }
     else if (ast instanceof Ref)
     {
@@ -869,9 +871,8 @@ function ast_to_js(ast, ctx)
     }
     else
     {
-        print(ast instanceof VariableStatement);////////////////////////
-        for (var k in ast)
-            print(k);
+//        for (var k in ast)
+//            print(k);
         error("UNKNOWN AST");
     }
 }

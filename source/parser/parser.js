@@ -785,11 +785,12 @@ function ArrayLiteral(loc, exprs)
     this.exprs = exprs;
 }
 
-function RegExpLiteral(loc, pattern, flags)
+function RegExpLiteral(loc, rx)
 {
     this.loc = loc;
-    this.pattern = pattern;
-    this.flags = flags;
+    this.regexp = rx.regexp;
+    this.pattern = rx.pattern;
+    this.flags = rx.flags;
 }
 
 function ObjectLiteral(loc, properties)
@@ -874,16 +875,12 @@ function Literal_5(p, STRING)
 
 function Literal_6(p, DIV)
 {
-    var reg = p.scanner.parse_regexp([]);
-
-    return new RegExpLiteral(DIV.loc, reg[0], reg[1]);
+    return new RegExpLiteral(DIV.loc, p.scanner.parse_regexp(false));
 }
 
 function Literal_7(p, DIVEQUAL)
 {
-    var reg = p.scanner.parse_regexp([61]);
-
-    return new RegExpLiteral(DIVEQUAL.loc, reg[0], reg[1]);
+    return new RegExpLiteral(DIVEQUAL.loc, p.scanner.parse_regexp(true));
 }
 
 function Property_1(p, IDENT, COLON, AssignmentExpr)

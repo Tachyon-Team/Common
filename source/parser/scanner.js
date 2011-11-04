@@ -42,9 +42,9 @@
 
 //=============================================================================
 
-// File: "scanner.js", Time-stamp: <2011-03-22 14:05:07 feeley>
+// File: "scanner.js"
 
-// Copyright (c) 2010 by Marc Feeley, All Rights Reserved.
+// Copyright (c) 2010-2011 by Marc Feeley, All Rights Reserved.
 
 //=============================================================================
 
@@ -526,7 +526,7 @@ Scanner.prototype.parse_number = function ()
 
     // Workaround to allow private helper functions
     // to access the "this" object
-    var that;
+    var scanner;
 
     // Computes the value of a serie of digit characters
     // as if they are on the "left-hand side" of the decimal point
@@ -535,10 +535,10 @@ Scanner.prototype.parse_number = function ()
         var n = 0;
         for (;;)
         {
-            var c = that.lookahead_char(0);
+            var c = scanner.lookahead_char(0);
             if (!accepted_char(c))
                 break;
-            that.advance(1);
+            scanner.advance(1);
             n = num_add(num_mul(n, base), char_value(c));
         }
         return n;
@@ -552,10 +552,10 @@ Scanner.prototype.parse_number = function ()
         var pos = 1;
         for (;;)
         {
-            var c = that.lookahead_char(0);
+            var c = scanner.lookahead_char(0);
             if (!accepted_char(c))
                 break;
-            that.advance(1);
+            scanner.advance(1);
             pos = pos * base;
             n = n * base + char_value(c);
         }
@@ -565,7 +565,7 @@ Scanner.prototype.parse_number = function ()
     // Decimal helper functions
     function decimal (c)
     {
-        return that.decimal_class(c);
+        return scanner.decimal_class(c);
     }
     
     function decimal_value (c)
@@ -576,7 +576,7 @@ Scanner.prototype.parse_number = function ()
     // Hex helper functions
     function hexadecimal (c)
     {
-        return that.hexadecimal_class(c);
+        return scanner.hexadecimal_class(c);
     }
 
     function hexadecimal_value (c) 
@@ -597,18 +597,18 @@ Scanner.prototype.parse_number = function ()
     return function ()
     {
         // Workaround for passing "this"
-        that = this;
+        scanner = this;
 
-        var start_pos = that.lookahead_pos(0);
+        var start_pos = scanner.lookahead_pos(0);
         var n;
-        var fst_char = that.lookahead_char(0);
-        var snd_char = that.lookahead_char(1);
+        var fst_char = scanner.lookahead_char(0);
+        var snd_char = scanner.lookahead_char(1);
         var exp_sign = 1;
 
         if (snd_char === LOWER_X_CH || snd_char === UPPER_X_CH)
         {
             // We got an hex number!
-            that.advance(2);
+            scanner.advance(2);
             n = lhs_value(hexadecimal, 16, hexadecimal_value);
         }
         else 
@@ -621,28 +621,28 @@ Scanner.prototype.parse_number = function ()
             n = lhs_value(decimal, 10, decimal_value);
 
             // We might have numbers after the decimal points
-            if (that.lookahead_char(0) === PERIOD_CH)
+            if (scanner.lookahead_char(0) === PERIOD_CH)
             {
-                that.advance(1);
+                scanner.advance(1);
                 n = n + rhs_value(decimal, 10, decimal_value);
             }
 
             // Let's check for an exponent
-            fst_char = that.lookahead_char(0);
+            fst_char = scanner.lookahead_char(0);
             if (fst_char === LOWER_E_CH || fst_char === UPPER_E_CH)
             {
-                that.advance(1);
+                scanner.advance(1);
 
                 // The exponent might have a sign  
-                fst_char = that.lookahead_char(0);
+                fst_char = scanner.lookahead_char(0);
                 if (fst_char === PLUS_CH)
                 {
                     exp_sign = 1;
-                    that.advance(1);
+                    scanner.advance(1);
                 } else if (fst_char === MINUS_CH)
                 {  
                     exp_sign = -1;
-                    that.advance(1);
+                    scanner.advance(1);
                 } 
 
                 n = n * Math.pow(10, exp_sign * 
@@ -651,7 +651,7 @@ Scanner.prototype.parse_number = function ()
         }
 
 
-        return that.valued_token(NUMBER_CAT, n, start_pos);
+        return scanner.valued_token(NUMBER_CAT, n, start_pos);
     };
 }();
 
@@ -767,31 +767,85 @@ Scanner.prototype.parse_string = function ()
     return this.valued_token(STRING_CAT, str, start_pos);
 };
 
-Scanner.prototype.parse_regexp = function (pattern)
+Scanner.prototype.parse_regexp = function (divequal)
 {
-    var flags = [];
+    var scanner = this;
+    var start_pos = this.lookahead_pos(0);
+    var regexp_chars = new String_output_port("");
+    var pattern_chars = new String_output_port("");
+    var flags_chars = new String_output_port("");
+    var c;
 
-    for (var c = this.lookahead_char(0);
-         c !== SLASH_CH;
-         this.advance(1), c = this.lookahead_char(0))
+    function read_char()
     {
-        if (this.lookahead_char(0) === BACKSLASH_CH &&
-            this.lookahead_char(1) === SLASH_CH)
+        var c = scanner.lookahead_char(0);
+
+        if (c === EOF || c === EOL_CH) // end-of-file or end-of-line
+            error("line terminator in regexp");
+
+        scanner.advance(1);
+        regexp_chars.write_char(c);
+
+        return c;
+    }
+
+    function read_pattern_char()
+    {
+        var c = read_char()
+        pattern_chars.write_char(c);
+        return c;
+    }
+
+    regexp_chars.write_char(SLASH_CH);
+
+    if (divequal)
+    {
+        regexp_chars.write_char(EQUAL_CH);
+        pattern_chars.write_char(EQUAL_CH);
+    }
+
+    for (;;)
+    {
+        c = read_char();
+
+        if (c === SLASH_CH) // /
+            break;
+
+        pattern_chars.write_char(c);
+        if (c === BACKSLASH_CH) // \
+            read_pattern_char();
+        else if (c === LBRACK_CH) // [
         {
-            this.advance(1);
-        }
-        pattern.push(this.lookahead_char(0));
-    }
-    this.advance(1);
+            for (;;)
+            {
+                c = read_pattern_char();
 
-    for (var c = this.lookahead_char(0);
-         this.identifier_class(c) || this.decimal_class(c);
-         this.advance(1), c = this.lookahead_char(0))
-    {
-        flags.push(c);
+                if (c === RBRACK_CH) // ]
+                    break;
+                else if (c === BACKSLASH_CH) // \
+                    read_pattern_char();
+            }
+        }
     }
-    return [String.fromCharCode.apply(null, pattern), String.fromCharCode.apply(null, flags)];
-}
+
+    for (;;)
+    {
+        c = this.lookahead_char(0);
+
+        if (!(this.identifier_class(c) || this.decimal_class(c)))
+            break;
+
+        this.advance(1);
+        regexp_chars.write_char(c);
+        flags_chars.write_char(c);
+    }
+
+    return {
+             regexp: regexp_chars.get_output_string(),
+             pattern: pattern_chars.get_output_string(),
+             flags: flags_chars.get_output_string()
+           };
+};
 
 // method simple_token(cat, n)
 
@@ -909,8 +963,12 @@ var EQUAL_CH       =  61;
 var GT_CH          =  62;
 var QUESTION_CH    =  63;
 var UPPER_A_CH     =  65;
+var UPPER_B_CH     =  66;
+var UPPER_D_CH     =  68;
 var UPPER_E_CH     =  69;
 var UPPER_F_CH     =  70;
+var UPPER_S_CH     =  83;
+var UPPER_W_CH     =  87;
 var UPPER_X_CH     =  88;
 var UPPER_Z_CH     =  90;
 var LBRACK_CH      =  91;
@@ -920,13 +978,17 @@ var CARET_CH       =  94;
 var UNDERSCORE_CH  =  95;
 var LOWER_A_CH     =  97;
 var LOWER_B_CH     =  98;
+var LOWER_C_CH     =  99;
+var LOWER_D_CH     = 100;
 var LOWER_E_CH     = 101;
 var LOWER_F_CH     = 102;
 var LOWER_N_CH     = 110;
 var LOWER_R_CH     = 114;
+var LOWER_S_CH     = 115;
 var LOWER_T_CH     = 116;
 var LOWER_U_CH     = 117;
 var LOWER_V_CH     = 118;
+var LOWER_W_CH     = 119;
 var LOWER_X_CH     = 120;
 var LOWER_Z_CH     = 122;
 var LBRACE_CH      = 123;
