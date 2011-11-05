@@ -1270,3 +1270,9 @@ var keyword_hashtable =
 //END-OF-SCANNER-TABLES
 
 //=============================================================================
+
+// Node.js support
+if (typeof exports !== "undefined")
+{
+    exports.Scanner = Scanner;
+}

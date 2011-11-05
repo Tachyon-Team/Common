@@ -173,3 +173,10 @@ function parse_src_port(port, params)
 }
 
 //=============================================================================
+
+// Node.js support
+if (typeof exports !== "undefined")
+{
+    exports.String_input_port = String_input_port;
+    exports.String_output_port = String_output_port;
+}

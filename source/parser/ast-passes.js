@@ -989,3 +989,9 @@ function ast_normalize(ast, options)
 }
 
 //=============================================================================
+
+// Node.js support
+if (typeof exports !== "undefined")
+{
+    exports.ast_normalize = ast_normalize;
+}

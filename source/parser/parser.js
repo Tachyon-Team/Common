@@ -4013,6 +4013,51 @@ function SourceElements_NoNode_2(p, SourceElements_NoNode, Statement_NoNode)
     return SourceElements_2(p, SourceElements_NoNode, Statement_NoNode);
 }
 
+// Node.js support
+if (typeof exports !== "undefined")
+{
+    exports.Parser = Parser;
+
+    exports.Program = Program;
+    exports.FunctionDeclaration = FunctionDeclaration;
+    exports.BlockStatement = BlockStatement;
+    exports.VariableStatement = VariableStatement;
+    exports.Decl = Decl;
+    exports.ConstStatement = ConstStatement;
+    exports.ExprStatement = ExprStatement;
+    exports.IfStatement = IfStatement;
+    exports.DoWhileStatement = DoWhileStatement;
+    exports.WhileStatement = WhileStatement;
+    exports.ForStatement = ForStatement;
+    exports.ForVarStatement = ForVarStatement;
+    exports.ForInStatement = ForInStatement;
+    exports.ForVarInStatement = ForVarInStatement;
+    exports.ContinueStatement = ContinueStatement;
+    exports.BreakStatement = BreakStatement;
+    exports.ReturnStatement = ReturnStatement;
+    exports.WithStatement = WithStatement;
+    exports.SwitchStatement = SwitchStatement;
+    exports.CaseClause = CaseClause;
+    exports.CaseBlock = CaseBlock;
+    exports.LabelledStatement = LabelledStatement;
+    exports.ThrowStatement = ThrowStatement;
+    exports.TryStatement = TryStatement;
+    exports.CatchPart = CatchPart;
+    exports.DebuggerStatement = DebuggerStatement;
+    exports.OpExpr = OpExpr;
+    exports.NewExpr = NewExpr;
+    exports.CallExpr = CallExpr;
+    exports.FunctionExpr = FunctionExpr;
+    exports.Arguments = Arguments;
+    exports.Literal = Literal;
+    exports.ArrayLiteral = ArrayLiteral;
+    exports.RegExpLiteral = RegExpLiteral;
+    exports.ObjectLiteral = ObjectLiteral;
+    exports.Property = Property;
+    exports.Ref = Ref;
+    exports.This = This;
+}
+
 //-----------------------------------------------------------------------------
 
 // Parser tables.

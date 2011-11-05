@@ -963,3 +963,11 @@ function js_var_assign(id, ctx)
 }
 
 //=============================================================================
+
+// Node.js support
+if (typeof exports !== "undefined")
+{
+    exports.pp = pp;
+    exports.js_pp = js_pp;
+    exports.js_to_string = js_to_string;
+}
