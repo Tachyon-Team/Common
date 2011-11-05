@@ -1,0 +1,25 @@
+#!/bin/sh
+
+command -v node &>/dev/null || { echo "node not found. Please install node.js and add it to your path." >&2; exit 1; }
+command -v npm &>/dev/null || { echo "npm not found. Please install npm and add it to your path." >&2; exit 1; }
+
+# Install required dependencies
+echo "Checking node.js dependencies"
+
+if [ ! -d "./node_modules/jsdom" ]; then
+    echo "  * Installing jsdom"
+    npm install jsdom || { echo "Installation failed" >&2; exit 1; }
+
+    echo "    Patching jsdom"
+    patch -p1 < patch/jsdom.patch || { echo "Patch failed" >&2; exit 1; }
+    echo "    Patching htmlparser"
+    patch -p1 < patch/htmlparser.patch || { echo "Patch failed" >&2; exit 1; }
+fi
+
+if [ ! -d "./node_modules/buffertools" ]; then
+    echo "  * Installing buffertools"
+    npm install buffertools || { echo "Installation failed" >&2; exit 1; }
+fi
+
+echo "Installation completed."
+echo "You can start the proxy using the 'run-proxy' script."

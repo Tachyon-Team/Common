@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Make sure we run node.js from the appropriate directory
+cd "${0%/*}" 2>/dev/null
+
+# Start the proxy
+node ./lib/proxy.js
