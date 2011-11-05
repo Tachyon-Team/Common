@@ -968,15 +968,17 @@ function profiling_pass(ast, options)
 
 function ast_normalize(ast, options)
 {
-    if (options === true || options === false) // support old interface
-        options = { profile: false,
-                    namespace: false,
-                    exports: {},
-                    debug: options,
-                    warn: false,
-                    ast: false,
-                    nojs: false
-                  };
+    if (options === true || options === false || options === undefined) // support old interface
+        options = {};
+
+    // Provide default values for unspecified options
+    if (!("profile" in options)) options.profile = false;
+    if (!("namespace" in options)) options.namespace = false;
+    if (!("exports" in options)) options.exports = {};
+    if (!("debug" in options)) options.debug = options;
+    if (!("warn" in options)) options.warn = false;
+    if (!("ast" in options)) options.ast = false;
+    if (!("nojs" in options)) options.nojs = false;
 
     simplification_pass(ast, options);
     var_resolution_pass(ast, options);
