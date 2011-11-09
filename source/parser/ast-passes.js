@@ -840,7 +840,7 @@ profiling_pass_ctx.prototype.walk_expr = function (ast)
         else
         {
             ast.fn = this.walk_expr(ast.fn);
-
+            return ast;
             return this.call_hook("profile$CallExpr_hook",
                                   ast.loc,
                                   ast);
