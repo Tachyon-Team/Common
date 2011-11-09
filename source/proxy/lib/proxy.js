@@ -146,7 +146,7 @@ var htmlHandler = {
 
         var js2js_script = document.createElement('script');
         js2js_script.setAttribute("type", "application/javascript");
-        js2js_script.setAttribute("src", "/js2js/js2js.js");
+        js2js_script.setAttribute("src", "/js2js/js2js-lib.js");
         container.insertBefore(js2js_script, container.children[0]);
 
         var a = document.createElement('a');
