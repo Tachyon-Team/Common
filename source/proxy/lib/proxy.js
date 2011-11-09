@@ -102,7 +102,7 @@ function instrument_js(data) {
         prefix = UNPARSEABLE_CRUFT;
         data = data.slice(UNPARSEABLE_CRUFT.length);
     }
-    var script = js2js.instrument(data, {profile: false});
+    var script = js2js.instrument(data, {profile: true});
     if (prefix !== null) {
         script = prefix + script;
     }

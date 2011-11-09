@@ -1,5 +1,11 @@
 #!/bin/sh
 
+# On a Mac, I did:
+#
+#    curl http://npmjs.org/install.sh | sh
+#    brew install node.js
+#    ./install
+
 command -v node &>/dev/null || { echo "node not found. Please install node.js and add it to your path." >&2; exit 1; }
 command -v npm &>/dev/null || { echo "npm not found. Please install npm and add it to your path." >&2; exit 1; }
 

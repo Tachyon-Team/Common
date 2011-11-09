@@ -54,7 +54,10 @@ Copyright (c) 2010 Maxime Chevalier-Boisvert, All Rights Reserved
 /**
 Store the command-line arguments in a globally visible variable.
 */
-var command_line_arguments = arguments;
+var command_line_arguments = [];
+
+if (typeof arguments !== "undefined") /* make it work in the browser */
+    command_line_arguments = arguments;
 
 /**
 Get the command-line arguments
