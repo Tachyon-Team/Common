@@ -804,7 +804,16 @@ function profile$set_var_mod(loc, val)
 
 function profile$call_prop(loc, obj, prop)
 {
+    obj = Object(obj);
     profile$fetch_prop(loc, obj, prop);
+    if (obj === undefined) {
+        console.log("Trying to access " + prop + " on undefined object");
+    } else if (((typeof obj === "object") || (typeof obj === "function")) && !(prop in obj)) {
+        console.log("Failed to find " + prop + " in " + (typeof obj) + " object " + obj);
+        for (var p in obj) {
+            console.log("  - " + p);
+        }
+    }
     var f = obj[prop];
     var args = [];
     for (var i=3; i<arguments.length; i++)
@@ -824,8 +833,8 @@ function profile$send_output(text)
 
 function profile$dump()
 {
-//    profile$send_output("<pre>"+profile$report()+"</pre>");
-    print(profile$report());
+    profile$send_output(profile$report());
+    // print(profile$report());
 }
 
 //setTimeout(profile$dump, 5000); // dump after 5 seconds

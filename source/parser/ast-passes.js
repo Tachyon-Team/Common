@@ -839,8 +839,8 @@ profiling_pass_ctx.prototype.walk_expr = function (ast)
         }
         else
         {
-            ast.fn = this.walk_expr(ast.fn);
             return ast;
+            ast.fn = this.walk_expr(ast.fn);
             return this.call_hook("profile$CallExpr_hook",
                                   ast.loc,
                                   ast);
@@ -952,6 +952,11 @@ profiling_pass_ctx.prototype.filter = function (ast)
         (this.fn_decl !== null &&
          this.fn_decl.id.toString() === "assert"))
         return false;
+    // if (position_to_line(ast.loc.start_pos) == 7 
+    //         && position_to_column(ast.loc.start_pos) === 54
+    //         && position_to_column(ast.loc.end_pos)) {
+    //     return false;
+    // }
     return true;
 };
 
