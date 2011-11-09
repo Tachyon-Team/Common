@@ -138,6 +138,7 @@ var htmlHandler = {
         } else {
             container = document.body;
         }
+        if (!container) return data; // Guard against empty documents
         var profiler_script = document.createElement('script');
         profiler_script.setAttribute("type", "application/javascript");
         profiler_script.setAttribute("src", "/js2js/profiler-lib.js");
