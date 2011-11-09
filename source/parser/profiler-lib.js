@@ -320,7 +320,7 @@ function profile$abstype_add(abstype, val)
                     obj: undefined,
                     other: []
                   };
-    if (val !== null && typeof val === 'object')
+    if (val !== null && typeof val === 'object' && val instanceof Object)
         profile$object_info(val);
     if (typeof val === 'number')
         abstype.num = profile$absnum_add(abstype.num, val);
@@ -334,7 +334,7 @@ function profile$abstype_add(abstype, val)
         abstype.nul = true;
     else if (typeof val === 'function')
         abstype.fn = true;
-    else if (typeof val === 'object')
+    else if (typeof val === 'object' && val instanceof Object)
         abstype.obj = profile$absobj_add(abstype.obj, val);
     else
         abstype.other.push(val);
@@ -557,7 +557,7 @@ function profile$access_prop_tp(loc, obj)
 
 function profile$fetch_prop(loc, obj, prop)
 {
-    if (typeof obj !== "object") return;
+    if (!(typeof obj !== 'object' && obj instanceof Object)) return;
     profile$fetch_counter++;
     profile$access_prop_tp(loc, obj);
     var info = profile$object_info(obj);
@@ -572,7 +572,7 @@ function profile$fetch_prop(loc, obj, prop)
 
 function profile$store_prop(loc, obj, prop)
 {
-    if (typeof obj !== "object") return;
+    if (!(typeof obj !== 'object' && obj instanceof Object)) return;
     profile$store_counter++;
     profile$access_prop_tp(loc, obj);
     var info = profile$object_info(obj);
