@@ -44,7 +44,6 @@ function profile$print(str)
 
 var profile$output = new profile$String_output_port();
 
-var profile$trace = false;
 var profile$nesting = -1;
 var profile$stack = [];
 var profile$object_infos = [];
@@ -127,11 +126,17 @@ function profile$clone(obj)
     error("Unsupported object type");
 }
 
-function profile$is_nonneg_int(obj)
+function profile$is_object(x)
 {
-    return typeof obj === "number" &&
-        Math.floor(obj) === obj &&
-        obj >= 0;
+    return (x !== null) &&
+           (typeof x === "object" || typeof x === "function");
+}
+
+function profile$is_nonneg_int(x)
+{
+    return typeof x === "number" &&
+           Math.floor(x) === x &&
+           x >= 0;
 }
 
 function profile$copy_props(props)
@@ -320,8 +325,10 @@ function profile$abstype_add(abstype, val)
                     obj: undefined,
                     other: []
                   };
-    if (val !== null && typeof val === 'object' && val instanceof Object)
+
+    if (profile$is_object(val))
         profile$object_info(val);
+
     if (typeof val === 'number')
         abstype.num = profile$absnum_add(abstype.num, val);
     else if (typeof val === 'string')
@@ -334,7 +341,7 @@ function profile$abstype_add(abstype, val)
         abstype.nul = true;
     else if (typeof val === 'function')
         abstype.fn = true;
-    else if (typeof val === 'object' && val instanceof Object)
+    else if (profile$is_object(val))
         abstype.obj = profile$absobj_add(abstype.obj, val);
     else
         abstype.other.push(val);
@@ -435,7 +442,7 @@ function profile$report()
     return profile$output.get_output_string();
 }
 
-function profile$nest(loc, fn, enter)
+function profile$nest(loc, enter, debug, fn)
 {
     var level;
     if (enter)
@@ -444,29 +451,34 @@ function profile$nest(loc, fn, enter)
     }
     else
         level = profile$nesting--;
-    if (!profile$trace) return;
-    var prefix = "";
-    if (level > 9) { prefix = "|["+level+"] "; level = 8; }
-    while (level-- > 0) prefix = "|  " + prefix;
-    profile$print(prefix+(enter?"((":"))")+" "+loc+": "+fn);
+    if (debug)
+    {
+        var prefix = "";
+        if (level > 9) { prefix = "|["+level+"] "; level = 8; }
+        while (level-- > 0) prefix = "|  " + prefix;
+        profile$log(prefix+(enter?"((":"))")+" "+loc+": "+fn);
+    }
 }
 
-function profile$enter(loc, fn, args)
+function profile$enter(loc, profile, debug, fn, args)
 {
-    profile$nest(loc, fn, true);
-    profile$enter_tp(fn, args);
+    profile$nest(loc, true, debug, fn);
+    if (profile)
+        profile$enter_tp(fn, args);
 }
 
-function profile$return0(loc)
+function profile$return0(loc, profile, debug, fn)
 {
-    profile$return_tp(undefined);
-    profile$nest(loc, false);
+    if (profile)
+        profile$return_tp(undefined);
+    profile$nest(loc, false, debug, fn)
 }
 
-function profile$return1(loc, result)
+function profile$return1(loc, profile, debug, fn, result)
 {
-    profile$return_tp(result);
-    profile$nest(loc, false);
+    if (profile)
+        profile$return_tp(result);
+    profile$nest(loc, false, debug, fn)
     return result;
 }
 
@@ -555,9 +567,32 @@ function profile$access_prop_tp(loc, obj)
     descr.abstype = profile$abstype_add(descr.abstype, obj);
 }
 
+function profile$fetch_store_prop(loc, obj, prop, val)
+{
+    profile$log(loc + " fetch/store " + (obj===window?"window":obj) + "." + prop + " = " + val);
+    if (profile$is_object(obj))
+    {
+        profile$fetch_prop_aux(loc, obj, prop);
+        profile$store_prop_aux(loc, obj, prop, val);
+    }
+}
+
 function profile$fetch_prop(loc, obj, prop)
 {
-    if (!(typeof obj !== 'object' && obj instanceof Object)) return;
+    profile$log(loc + " fetch " + (obj===window?"window":obj) + "." + prop);
+    if (profile$is_object(obj))
+        profile$fetch_prop_aux(loc, obj, prop);
+}
+
+function profile$store_prop(loc, obj, prop, val)
+{
+    profile$log(loc + " store " + (obj===window?"window":obj) + "." + prop + " = " + val);
+    if (profile$is_object(obj))
+        profile$store_prop_aux(loc, obj, prop, val);
+}
+
+function profile$fetch_prop_aux(loc, obj, prop)
+{
     profile$fetch_counter++;
     profile$access_prop_tp(loc, obj);
     var info = profile$object_info(obj);
@@ -570,9 +605,8 @@ function profile$fetch_prop(loc, obj, prop)
     }
 }
 
-function profile$store_prop(loc, obj, prop)
+function profile$store_prop_aux(loc, obj, prop, val)
 {
-    if (!(typeof obj !== 'object' && obj instanceof Object)) return;
     profile$store_counter++;
     profile$access_prop_tp(loc, obj);
     var info = profile$object_info(obj);
@@ -597,128 +631,113 @@ function profile$get_prop(loc, obj, prop)
 
 function profile$put_prop_preinc(loc, obj, prop)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = ++obj[prop];
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop_predec(loc, obj, prop)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = --obj[prop];
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop_postinc(loc, obj, prop)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = obj[prop]++;
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop_postdec(loc, obj, prop)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = obj[prop]--;
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop(loc, obj, prop, val)
 {
-    profile$store_prop(loc, obj, prop);
     var result = obj[prop] = val;
+    profile$store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop_add(loc, obj, prop, val)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = obj[prop] += val;
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop_sub(loc, obj, prop, val)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = obj[prop] -= val;
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop_mul(loc, obj, prop, val)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = obj[prop] *= val;
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop_div(loc, obj, prop, val)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = obj[prop] /= val;
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop_lsh(loc, obj, prop, val)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = obj[prop] <<= val;
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop_rsh(loc, obj, prop, val)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = obj[prop] >>= val;
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop_ursh(loc, obj, prop, val)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = obj[prop] >>>= val;
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop_and(loc, obj, prop, val)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = obj[prop] &= val;
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop_xor(loc, obj, prop, val)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = obj[prop] ^= val;
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop_ior(loc, obj, prop, val)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = obj[prop] |= val;
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
 function profile$put_prop_mod(loc, obj, prop, val)
 {
-    profile$fetch_prop(loc, obj, prop);
-    profile$store_prop(loc, obj, prop);
     var result = obj[prop] %= val;
+    profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }
 
@@ -804,21 +823,27 @@ function profile$set_var_mod(loc, val)
 
 function profile$call_prop(loc, obj, prop)
 {
-    obj = Object(obj);
-    profile$fetch_prop(loc, obj, prop);
-    if (obj === undefined) {
-        console.log("Trying to access " + prop + " on undefined object");
-    } else if (((typeof obj === "object") || (typeof obj === "function")) && !(prop in obj)) {
-        console.log("Failed to find " + prop + " in " + (typeof obj) + " object " + obj);
-        for (var p in obj) {
-            console.log("  - " + p);
-        }
-    }
+    profile$log(loc + " call " + (obj===window?"window":obj) + "." + prop);
+    if (profile$is_object(obj))
+        profile$fetch_prop_aux(loc, obj, prop);
+//    if (obj === undefined) {
+//        console.log("Trying to access " + prop + " on undefined object");
+//    } else if (((typeof obj === "object") || (typeof obj === "function")) && !(prop in obj)) {
+//        console.log("Failed to find " + prop + " in " + (typeof obj) + " object " + obj);
+//        for (var p in obj) {
+//            console.log("  - " + p);
+//        }
+//    }
     var f = obj[prop];
     var args = [];
     for (var i=3; i<arguments.length; i++)
         args.push(arguments[i]);
     return f.apply(obj, args);
+}
+
+function profile$log(text)
+{
+    console.log(text);
 }
 
 function profile$send_output(text)
@@ -834,7 +859,7 @@ function profile$send_output(text)
 function profile$dump()
 {
     profile$send_output(profile$report());
-    // print(profile$report());
+//    print(profile$report());
 }
 
 //setTimeout(profile$dump, 5000); // dump after 5 seconds

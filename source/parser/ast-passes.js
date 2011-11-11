@@ -668,20 +668,32 @@ profiling_pass_ctx.prototype.walk_statement = function (ast)
     else if (ast instanceof ReturnStatement)
     {
         ast.expr = this.walk_expr(ast.expr);
+
         if (!this.filter(ast))
         {
             return ast;
         }
         else if (ast.expr !== null)
         {
-            ast.expr = this.call_hook("profile$return1", ast.loc, ast.expr);
+            ast.expr = this.call_hook(
+                           "profile$return1",
+                           ast.loc,
+                           new Literal(ast.loc, this.options.profile),
+                           new Literal(ast.loc, this.options.debug),
+                           new Literal(ast.loc, ""),
+                           ast.expr);
             return ast;
         }
         else
         {
             return new BlockStatement(ast.loc,
                                       [new ExprStatement(ast.loc,
-                                                        this.call_hook("profile$return0", ast.loc)),
+                                                        this.call_hook(
+                                                            "profile$return0",
+                                                            ast.loc,
+                                                            new Literal(ast.loc, this.options.profile),
+                                                            new Literal(ast.loc, this.options.debug),
+                                                            new Literal(ast.loc, ""))),
                                        ast]);
         }
     }
@@ -735,7 +747,52 @@ function is_assign_op2(op)
 
 profiling_pass_ctx.prototype.walk_expr = function (ast)
 {
-    if (ast instanceof OpExpr)
+    if (ast instanceof FunctionExpr)
+    {
+        ast.body = ast_walk_statements(ast.body, this);
+
+        if (this.filter(ast))
+        {
+            var args_tok = new Token(IDENT_CAT, "arguments", ast.loc);
+            var args_var = resolve_var(this.prog, args_tok);
+            var fn = ((this.fn_decl !== null)
+                      ? this.fn_decl.id.toString()
+                      : "")
+                     + "(" + ast.params.join() + ")";
+
+            ast.body.unshift(
+                new ExprStatement(ast.loc,
+                                  this.call_hook(
+                                      "profile$enter",
+                                      ast.loc,
+                                      new Literal(ast.loc, this.options.profile),
+                                      new Literal(ast.loc, this.options.debug),
+                                      new Literal(ast.loc, fn),
+                                      new Ref(ast.loc, args_var))));
+
+            ast.body.push(new ExprStatement(ast.loc,
+                                            this.call_hook(
+                                                "profile$return0",
+                                                ast.loc,
+                                                new Literal(ast.loc, this.options.profile),
+                                                new Literal(ast.loc, this.options.debug),
+                                                new Literal(ast.loc, fn))));
+        }
+
+        if (!this.options.profile)
+            return ast;
+
+        return ast;///////////////////////// why are we exiting prematurely?
+
+        return this.call_hook("profile$FunctionExpr_hook",
+                              ast.loc,
+                              ast);
+    }
+    else if (!this.options.profile)
+    {
+        return ast_walk_expr(ast, this);
+    }
+    else if (ast instanceof OpExpr)
     {
         var op = ast.op;
 
@@ -839,45 +896,12 @@ profiling_pass_ctx.prototype.walk_expr = function (ast)
         }
         else
         {
-            return ast;
+            return ast;///////////////////////////////////
             ast.fn = this.walk_expr(ast.fn);
             return this.call_hook("profile$CallExpr_hook",
                                   ast.loc,
                                   ast);
         }
-    }
-    else if (ast instanceof FunctionExpr)
-    {
-        ast.body = ast_walk_statements(ast.body, this);
-
-        if (this.filter(ast))
-        {
-            var args_tok = new Token(IDENT_CAT, "arguments", ast.loc);
-            var args_var = resolve_var(this.prog, args_tok);
-
-            ast.body.unshift(
-                new ExprStatement(ast.loc,
-                                  this.call_hook(
-                                      "profile$enter",
-                                      ast.loc,
-                                      new Literal(ast.loc,
-                                                  ((this.fn_decl !== null)
-                                                   ? this.fn_decl.id.toString()
-                                                   : "")
-                                                  + "(" + ast.params.join() + ")"),
-                                      new Ref(ast.loc,
-                                              args_var))));
-
-            ast.body.push(new ExprStatement(ast.loc,
-                                            this.call_hook("profile$return0",
-                                                           ast.loc)));
-        }
-
-        return ast;///////////////////////// why are we exiting prematurely?
-
-        return this.call_hook("profile$FunctionExpr_hook",
-                              ast.loc,
-                              ast);
     }
     else if (ast instanceof Literal)
     {
@@ -962,7 +986,7 @@ profiling_pass_ctx.prototype.filter = function (ast)
 
 function profiling_pass(ast, options)
 {
-    if (options.profile)
+    if (options.debug || options.profile)
     {
         var ctx = new profiling_pass_ctx(options, null, null);
         ctx.walk_statement(ast);
