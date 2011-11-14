@@ -12,7 +12,7 @@ var DEBUG = false;
 
 var options = {
     recordSource: false,
-    js2jsOptions: {profile: false, debug: true},
+    js2jsOptions: {profile: true, debug: true},
 };
 
 jsdom.defaultDocumentFeatures = {

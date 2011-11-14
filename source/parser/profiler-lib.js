@@ -221,10 +221,19 @@ function profile$object_info_get(obj)
 function profile$object_info(obj)
 {
     var info;
-    if (!obj.hasOwnProperty("profile$info"))
+    try
+    {
+        if (obj.hasOwnProperty("profile$info"))
+            info = obj["profile$info"];
+        else
+            info = profile$object_info_get(obj);
+    }
+    catch (e)
+    {
+        // TODO: remove this try/catch
+        console.log("this object does not have hasOwnProperty: " + obj);
         info = profile$object_info_get(obj);
-    else
-        info = obj["profile$info"];
+    }
     return info;
 }
 
