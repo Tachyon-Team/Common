@@ -788,6 +788,44 @@ profiling_pass_ctx.prototype.walk_expr = function (ast)
                               ast.loc,
                               ast);
     }
+    else if (ast instanceof CallExpr)
+    {
+        ast.args = ast_walk_exprs(ast.args, this);
+
+        if (ast.fn instanceof Ref &&
+            ast.fn.id.special === "eval")
+        {
+            if (ast.args.length >= 1)
+                ast.args[0] = this.call_hook("profile$instrument_hook",
+                                             ast.loc,
+                                             ast.args[0]);
+            return this.call_hook("profile$EvalExpr_hook",
+                                  ast.loc,
+                                  ast);
+        }
+        else if (!this.options.profile)
+        {
+            ast.fn = this.walk_expr(ast.fn);
+            return ast;
+        }
+        else if (false && is_prop_access(ast.fn))
+        {
+            return this.call_hook.apply(this,
+                                        ["profile$call_prop",
+                                         ast.loc,
+                                         this.walk_expr(ast.fn.exprs[0]),
+                                         this.walk_expr(ast.fn.exprs[1])]
+                                        .concat(ast.args));
+        }
+        else
+        {
+            return ast;///////////////////////////////////
+            ast.fn = this.walk_expr(ast.fn);
+            return this.call_hook("profile$CallExpr_hook",
+                                  ast.loc,
+                                  ast);
+        }
+    }
     else if (!this.options.profile)
     {
         return ast_walk_expr(ast, this);
@@ -869,39 +907,6 @@ profiling_pass_ctx.prototype.walk_expr = function (ast)
         return this.call_hook("profile$NewExpr_hook",
                               ast.loc,
                               ast_walk_expr(ast, this));
-    }
-    else if (ast instanceof CallExpr)
-    {
-        ast.args = ast_walk_exprs(ast.args, this);
-
-        if (ast.fn instanceof Ref &&
-            ast.fn.id.special === "eval")
-        {
-            if (ast.args.length >= 1)
-                ast.args[0] = this.call_hook("profile$instrument_hook",
-                                             ast.loc,
-                                             ast.args[0]);
-            return this.call_hook("profile$EvalExpr_hook",
-                                  ast.loc,
-                                  ast);
-        }
-        else if (false && is_prop_access(ast.fn))
-        {
-            return this.call_hook.apply(this,
-                                        ["profile$call_prop",
-                                         ast.loc,
-                                         this.walk_expr(ast.fn.exprs[0]),
-                                         this.walk_expr(ast.fn.exprs[1])]
-                                        .concat(ast.args));
-        }
-        else
-        {
-            return ast;///////////////////////////////////
-            ast.fn = this.walk_expr(ast.fn);
-            return this.call_hook("profile$CallExpr_hook",
-                                  ast.loc,
-                                  ast);
-        }
     }
     else if (ast instanceof Literal)
     {

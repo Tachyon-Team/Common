@@ -102,17 +102,25 @@ function parseURL(url) {
 
 var UNPARSEABLE_CRUFT = "throw 1; < don't be evil' >"; // For handling google XSS security stuff
 
-function instrument_js(data) {
+function instrument_js(data, filename) {
     var prefix = null;
     if (str_startsWith(data, UNPARSEABLE_CRUFT)) {
         prefix = UNPARSEABLE_CRUFT;
         data = data.slice(UNPARSEABLE_CRUFT.length);
     }
+    recordSource(data, filename);
+    options.js2jsOptions.filename = filename;
     var script = js2js.instrument(data, options.js2jsOptions);
     if (prefix !== null) {
         script = prefix + script;
     }
     return script;
+}
+
+function recordSource(scriptSource, filename) {
+    if (options.recordSource) {
+        fs.writeFileSync(filename, scriptSource);
+    }
 }
 
 var htmlHandler = {
@@ -139,10 +147,8 @@ var htmlHandler = {
             var e = scripts[i];
             if (!e.hasAttribute('src')) {
                 var src = decodeEntities(e.innerHTML + "\n")
-                var script = instrument_js(src);
-                if (options.recordSource) {
-                    scriptSourceHandler.record(src, "page" + this.pageCount + "$" + i + ".js");
-                }
+                var filename = "page" + this.pageCount + "$" + i + ".js";
+                var script = instrument_js(src, filename);
                 e.innerHTML = encodeEntities(script);
             }
         }
@@ -192,12 +198,9 @@ var jsHandler = {
     },
 
     process: function (request, response, data) {
-        if (options.recordSource) {
-            var url = parseURL(request.url);
-            var scriptName = path.basename(url.pathname);
-            scriptSourceHandler.record(data, scriptName);
-        }
-        return instrument_js(data + "\n");
+        var url = parseURL(request.url);
+        var scriptName = path.basename(url.pathname);
+        return instrument_js(data + "\n", "script_" + scriptName);
     },
 };
 
@@ -230,7 +233,7 @@ var profileOutputHandler = {
 
     accepts: function (request) {
         var url = parseURL(request.url);
-        return request.method === 'POST' && url.pathname === "/profile_output";
+        return request.method === 'POST' && str_endsWith(url.pathname, "/profile_output");
     },
 
     process: function (request, response) {
@@ -242,18 +245,18 @@ var profileOutputHandler = {
 
         request.addListener('end', function() {
             fs.writeFileSync("profile.out", merge(chunks));
-            response.end();
+            response.writeHead(200, { 'Content-Type': 'text/plain' });
+            response.end("done\n");
         });
     },
 };
 
 var scriptSourceHandler = {
     name: "SCRIPT",
-    count: 0,
 
     accepts: function (request) {
         var url = parseURL(request.url);
-        return request.method === 'POST' && url.pathname === "/proxy$scriptSource";
+        return request.method === 'POST' && str_endsWith(url.pathname, "/proxy$scriptSource");
     },
 
     process: function (request, response) {
@@ -265,13 +268,12 @@ var scriptSourceHandler = {
         });
 
         request.addListener('end', function() {
-            handler.record(merge(chunks), "eval" + (handler.count++));
-            response.end();
+            var url = parseURL(request.url);
+            var filename = url.query.replace('filename=', '');
+            recordSource(merge(chunks), filename);
+            response.writeHead(200, { 'Content-Type': 'text/plain' });
+            response.end("done\n");
         });
-    },
-
-    record: function (scriptSource, name) {
-        fs.writeFileSync(name, scriptSource);
     },
 };
 

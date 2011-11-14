@@ -49,6 +49,7 @@ var profile$stack = [];
 var profile$object_infos = [];
 var profile$fn_abstypes = {};
 var profile$prop_access_abstypes = {};
+var profile$eval_counter = 0;
 var profile$fetch_counter = 0;
 var profile$store_counter = 0;
 var profile$obj_counter = 0;
@@ -398,6 +399,8 @@ function profile$report()
         prop_access_descrs.push(profile$prop_access_abstypes[loc]);
     prop_access_descrs.sort(function (x,y) { return (x.accesses > y.accesses) ? 1 : -1; });
 
+    var log = profile$output.get_output_string();
+
     profile$output = new profile$String_output_port();
 
     profile$print("--------------------------- TYPE PROFILE");
@@ -438,6 +441,9 @@ function profile$report()
       profile$print(descr.accesses + " " + "(" + descr.loc + ":) " + profile$abstype_to_string(descr.abstype));
       profile$print("");
     }
+
+    profile$print("--------------------------- LOG");
+    profile$print(log);
 
     return profile$output.get_output_string();
 }
@@ -533,10 +539,10 @@ function profile$EvalExpr_hook(loc, val)
     return val;
 }
 
-function profile$send_script(source)
+function profile$send_script(source, filename)
 {
     var http = new XMLHttpRequest();
-    http.open("POST", "proxy$scriptSource", true);
+    http.open("POST", "proxy$scriptSource?filename="+filename, true);
     http.setRequestHeader("Content-type", "application/javascript");
     http.setRequestHeader("Content-length", source.length);
     http.setRequestHeader("Connection", "close");
@@ -554,8 +560,13 @@ function profile$instrument_hook(loc, expr)
                     nojs: false
                   };
 
-    profile$send_script(expr);
-    var port = new js2js$String_input_port(expr + "\n", "<eval at " + loc + ">");
+    profile$eval_counter++;
+
+    var filename = "(" + loc.replace(/"/g,'') + ")eval" + profile$eval_counter + ".js";
+
+    profile$send_script(expr, filename);
+
+    var port = new js2js$String_input_port(expr + "\n", filename);
     var s = new js2js$Scanner(port);
     var p = new js2js$Parser(s, options.warn);
     var prog = p.parse();
@@ -580,7 +591,7 @@ function profile$access_prop_tp(loc, obj)
 
 function profile$fetch_store_prop(loc, obj, prop, val)
 {
-    profile$log(loc + " fetch/store " + (obj===window?"window":obj) + "." + prop + " = " + val);
+    profile$log(loc + ": fetch/store " + (obj===window?"window":obj) + "." + prop + " = " + val);
     if (profile$is_object(obj))
     {
         profile$fetch_prop_aux(loc, obj, prop);
@@ -590,14 +601,14 @@ function profile$fetch_store_prop(loc, obj, prop, val)
 
 function profile$fetch_prop(loc, obj, prop)
 {
-    profile$log(loc + " fetch " + (obj===window?"window":obj) + "." + prop);
+    profile$log(loc + ": fetch " + (obj===window?"window":obj) + "." + prop);
     if (profile$is_object(obj))
         profile$fetch_prop_aux(loc, obj, prop);
 }
 
 function profile$store_prop(loc, obj, prop, val)
 {
-    profile$log(loc + " store " + (obj===window?"window":obj) + "." + prop + " = " + val);
+    profile$log(loc + ": store " + (obj===window?"window":obj) + "." + prop + " = " + val);
     if (profile$is_object(obj))
         profile$store_prop_aux(loc, obj, prop, val);
 }
@@ -834,7 +845,7 @@ function profile$set_var_mod(loc, val)
 
 function profile$call_prop(loc, obj, prop)
 {
-    profile$log(loc + " call " + (obj===window?"window":obj) + "." + prop);
+    profile$log(loc + ": call " + (obj===window?"window":obj) + "." + prop);
     if (profile$is_object(obj))
         profile$fetch_prop_aux(loc, obj, prop);
 //    if (obj === undefined) {
@@ -854,7 +865,7 @@ function profile$call_prop(loc, obj, prop)
 
 function profile$log(text)
 {
-    console.log(text);
+    profile$print(text);
 }
 
 function profile$send_output(text)
