@@ -533,6 +533,16 @@ function profile$EvalExpr_hook(loc, val)
     return val;
 }
 
+function profile$send_script(source)
+{
+    var http = new XMLHttpRequest();
+    http.open("POST", "proxy$scriptSource", true);
+    http.setRequestHeader("Content-type", "application/javascript");
+    http.setRequestHeader("Content-length", source.length);
+    http.setRequestHeader("Connection", "close");
+    http.send(source);
+}
+
 function profile$instrument_hook(loc, expr)
 {
     var options = { profile: true,
@@ -544,6 +554,7 @@ function profile$instrument_hook(loc, expr)
                     nojs: false
                   };
 
+    profile$send_script(expr);
     var port = new js2js$String_input_port(expr + "\n", "<eval at " + loc + ">");
     var s = new js2js$Scanner(port);
     var p = new js2js$Parser(s, options.warn);
