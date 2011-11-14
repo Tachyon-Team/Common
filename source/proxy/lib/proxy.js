@@ -1,4 +1,5 @@
 var http     = require('http');
+var path     = require('path');
 var jsdom    = require('jsdom');
 var fs       = require('fs');
 var Buffer   = require('buffer').Buffer;
@@ -8,6 +9,11 @@ var querystr = require('querystring');
 var js2js    = require('js2js');
 
 var DEBUG = false;
+
+var options = {
+    recordSource: false,
+    js2jsOptions: {profile: false, debug: true},
+};
 
 jsdom.defaultDocumentFeatures = {
     FetchExternalResources   : false,
@@ -102,7 +108,7 @@ function instrument_js(data) {
         prefix = UNPARSEABLE_CRUFT;
         data = data.slice(UNPARSEABLE_CRUFT.length);
     }
-    var script = js2js.instrument(data, {profile: false, debug: true});
+    var script = js2js.instrument(data, options.js2jsOptions);
     if (prefix !== null) {
         script = prefix + script;
     }
@@ -110,12 +116,14 @@ function instrument_js(data) {
 }
 
 var htmlHandler = {
-    accepts: function (response) {
+    pageCount: 0,
+
+    accepts: function (request, response) {
         var content_type = getProperty(response.headers, "content-type", "");
         return str_startsWith(content_type, "text/html");
     },
 
-    process: function (response, data) {
+    process: function (request, response, data) {
         if (!data) return data;
 
         var window = jsdom.jsdom(data).createWindow();
@@ -124,10 +132,17 @@ var htmlHandler = {
         // Instrument existing scripts
         var scripts = document.getElementsByTagName('script');
         var count = 0;
+        if (scripts.length) {
+            this.pageCount++;
+        }
         for (var i = 0; i < scripts.length; i++) {
             var e = scripts[i];
             if (!e.hasAttribute('src')) {
-                var script = instrument_js(decodeEntities(e.innerHTML + "\n"));
+                var src = decodeEntities(e.innerHTML + "\n")
+                var script = instrument_js(src);
+                if (options.recordSource) {
+                    scriptSourceHandler.record(src, "page" + this.pageCount + "$" + i + ".js");
+                }
                 e.innerHTML = encodeEntities(script);
             }
         }
@@ -166,7 +181,7 @@ var htmlHandler = {
 };
 
 var jsHandler = {
-    accepts: function (response) {
+    accepts: function (request, response) {
         var content_type = getProperty(response.headers, "content-type", "");
     
         return str_startsWith(content_type, "application/javascript")
@@ -176,14 +191,19 @@ var jsHandler = {
             || str_startsWith(content_type, "text/ecmascript");
     },
 
-    process: function (response, data) {
+    process: function (request, response, data) {
+        if (options.recordSource) {
+            var url = parseURL(request.url);
+            var scriptName = path.basename(url.pathname);
+            scriptSourceHandler.record(data, scriptName);
+        }
         return instrument_js(data + "\n");
     },
 };
 
 // ----- Request handlers -----
 
-var scriptSourceHandler = {
+var js2jsHandler = {
     name : "JS2JS",
 
     accepts: function (request) {
@@ -227,6 +247,34 @@ var profileOutputHandler = {
     },
 };
 
+var scriptSourceHandler = {
+    name: "SCRIPT",
+    count: 0,
+
+    accepts: function (request) {
+        var url = parseURL(request.url);
+        return request.method === 'POST' && url.pathname === "/proxy$scriptSource";
+    },
+
+    process: function (request, response) {
+        var chunks = [];
+        var handler = this;
+
+        request.addListener('data', function(chunk) {
+            chunks.push(chunk);
+        });
+
+        request.addListener('end', function() {
+            handler.record(merge(chunks), "eval" + (handler.count++));
+            response.end();
+        });
+    },
+
+    record: function (scriptSource, name) {
+        fs.writeFileSync(name, scriptSource);
+    },
+};
+
 function ProxyHandler(handlers, filters) {
     this.name = "PROXY";
     this.handlers = handlers;
@@ -246,12 +294,12 @@ ProxyHandler.prototype.applyFilters = function (response, data) {
     return data;
 };
 
-ProxyHandler.prototype.handleResponse = function (response, data) {
+ProxyHandler.prototype.handleResponse = function (request, response, data) {
     for (var i = 0; i < this.handlers.length; i++) {
         var handler = this.handlers[i];
-        if (handler.accepts(response)) {
+        if (handler.accepts(request, response)) {
             data = this.applyFilters(response, data);
-            data = handler.process(response, data);
+            data = handler.process(request, response, data);
             break;
         }
     }
@@ -286,7 +334,7 @@ ProxyHandler.prototype.process = function (request, response) {
             if (str_startsWith(content_type, "text/html") || str_startsWith(content_type, "text/javascript")) {
                  data = data.toString("utf8");
             }
-            data = handler.handleResponse(proxy_response, data);
+            data = handler.handleResponse(request, proxy_response, data);
 
             var buffer;
             if (typeof data === "string") {
@@ -327,7 +375,22 @@ function createProxyServer(handlers) {
     });
 }
 
+function parseCmdLine(argv) {
+    if (argv.length <= 2) return;
+
+    for (var i = 2; i < argv.length; i++) {
+        if (argv[i] === "--record-js") {
+            options.recordSource = true;
+        } else {
+            throw "Unrecognized option: " + argv[i];
+        }
+    }
+}
+
+parseCmdLine(process.argv);
+
 createProxyServer([
+    js2jsHandler,
     scriptSourceHandler,
     profileOutputHandler, 
     new ProxyHandler([

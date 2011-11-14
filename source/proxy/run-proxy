@@ -4,4 +4,4 @@
 cd "${0%/*}" 2>/dev/null
 
 # Start the proxy
-node ./lib/proxy.js
+node ./lib/proxy.js "$@"
