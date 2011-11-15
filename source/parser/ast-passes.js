@@ -521,7 +521,7 @@ function resolve_var(scope, id)
 {
     var id_str = id.toString();
 
-    while (true)
+    for (;;)
     {
         // Check if id is declared in the current scope
 
@@ -999,6 +999,95 @@ function profiling_pass(ast, options)
 
 //-----------------------------------------------------------------------------
 
+// Free variable analysis.
+//
+// This pass determines the free variables of all FunctionExpr and CatchPart.
+
+function free_var_pass_ctx(options, scope)
+{
+    this.options = options;
+    this.scope = scope;
+}
+
+free_var_pass_ctx.prototype.create_ctx = function (ast)
+{
+    return new free_var_pass_ctx(this.options, ast);
+}
+
+free_var_pass_ctx.prototype.occurs_free_init = function (ast)
+{
+    for (var id_str in ast.vars)
+        ast.vars[id_str].occurs_free = false; // add occurs_free property
+}
+
+free_var_pass_ctx.prototype.occurs_free_check = function (v)
+{
+    if (v.scope instanceof Program) // Global variables aren't considered free
+        return;
+
+    // Variable v is declared in a FunctionExpr or CatchPart
+
+    var scope = this.scope;
+
+    if (scope !== v.scope)
+    {
+        v.occurs_free = true;
+
+        var id_str = v.toString();
+
+        do
+        {
+            if (scope instanceof FunctionExpr)
+                scope.free_vars[id_str] = v;
+            scope = scope.parent;
+        } while (scope !== v.scope);
+    }
+}
+
+free_var_pass_ctx.prototype.walk_statement = function (ast)
+{
+    if (ast instanceof Program)
+    {
+        var new_ctx = this.create_ctx(ast);
+        this.occurs_free_init(ast);
+        return ast_walk_statement(ast, new_ctx);
+    }
+    else if (ast instanceof CatchPart)
+    {
+        var new_ctx = this.create_ctx(ast);
+        this.occurs_free_init(ast);
+        return ast_walk_statement(ast, new_ctx);
+    }
+    else
+        return ast_walk_statement(ast, this);
+};
+
+free_var_pass_ctx.prototype.walk_expr = function (ast)
+{
+    if (ast instanceof FunctionExpr)
+    {
+        var new_ctx = this.create_ctx(ast);
+        this.occurs_free_init(ast);
+        ast.free_vars = {};
+        return ast_walk_expr(ast, new_ctx);
+    }
+    else if (ast instanceof Ref)
+    {
+        this.occurs_free_check(ast.id);
+        return ast;
+    }
+    else
+        return ast_walk_expr(ast, this);
+};
+
+function free_var_pass(ast, options)
+{
+    var ctx = new free_var_pass_ctx(options, null);
+    ctx.walk_statement(ast);
+}
+
+//-----------------------------------------------------------------------------
+
 function ast_normalize(ast, options)
 {
     if (options === true || options === false || options === undefined) // support old interface
@@ -1017,6 +1106,7 @@ function ast_normalize(ast, options)
     var_resolution_pass(ast, options);
     profiling_pass(ast, options);
     renaming_pass(ast, options);
+    free_var_pass(ast, options);
 
     return ast;
 }

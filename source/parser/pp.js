@@ -70,12 +70,6 @@ function pp_indent(ast, indent)
         }
 
 /*
-        if (ast.free_vars !== null)
-        {
-            for (var v in ast.free_vars)
-                pp_id(ast.free_vars[v], indent, "free_var");
-        }
-
         if (ast.funcs !== null)
         {
             for (var i in ast.funcs)
@@ -229,6 +223,13 @@ function pp_indent(ast, indent)
     {
         pp_loc(ast.loc, pp_prefix(indent) + "CatchPart");
         pp_id(ast.id, indent, "id");
+
+        if (typeof ast.free_vars !== "undefined")
+        {
+            for (var id_str in ast.free_vars)
+                pp_id(ast.free_vars[id_str], indent, "free_var");
+        }
+
         pp_asts(indent, "statement", [ast.statement]);
     }
     else if (ast instanceof DebuggerStatement)
@@ -272,13 +273,13 @@ function pp_indent(ast, indent)
                 pp_id(ast.vars[v], indent, "var");
         }
 
-/*
-        if (ast.free_vars !== null)
+        if (typeof ast.free_vars !== "undefined")
         {
-            for (var v in ast.free_vars)
-                pp_id(ast.free_vars[v], indent, "free_var");
+            for (var id_str in ast.free_vars)
+                pp_id(ast.free_vars[id_str], indent, "free_var");
         }
 
+/*
         if (ast.funcs !== null)
         {
             for (var i in ast.funcs)
@@ -343,6 +344,12 @@ function pp_id(id, indent, label)
             kind = "local";
         else if (id.scope instanceof CatchPart)
             kind = "catch";
+
+        if (typeof id.occurs_free !== "undefined")
+        {
+            if (id.occurs_free)
+                kind += ",occurs_free";
+        }
 
         pp_loc(id.scope.loc, pp_prefix(indent) + "|-" + label + "= " + id.toString() + " [" + kind + "]");
     }
