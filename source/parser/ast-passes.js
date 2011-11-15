@@ -808,7 +808,7 @@ profiling_pass_ctx.prototype.walk_expr = function (ast)
             ast.fn = this.walk_expr(ast.fn);
             return ast;
         }
-        else if (false && is_prop_access(ast.fn))
+        else if (is_prop_access(ast.fn))
         {
             return this.call_hook.apply(this,
                                         ["profile$call_prop",
@@ -819,7 +819,6 @@ profiling_pass_ctx.prototype.walk_expr = function (ast)
         }
         else
         {
-            return ast;///////////////////////////////////
             ast.fn = this.walk_expr(ast.fn);
             return this.call_hook("profile$CallExpr_hook",
                                   ast.loc,

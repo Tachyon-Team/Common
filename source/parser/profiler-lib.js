@@ -580,8 +580,11 @@ function profile$instrument_hook(loc, expr)
     var p = new js2js$Parser(s, options.warn);
     var prog = p.parse();
     var normalized_prog = js2js$ast_normalize(prog, options);
+    var new_expr = js2js$js_to_string(normalized_prog);
 
-    return js2js$js_to_string(normalized_prog);
+    profile$send_script(new_expr, filename + ".js");
+
+    return new_expr;
 }
 
 function profile$access_prop_tp(loc, obj)
@@ -600,7 +603,7 @@ function profile$access_prop_tp(loc, obj)
 
 function profile$fetch_store_prop(loc, obj, prop, val)
 {
-    profile$log(loc + ": fetch/store " + (obj===window?"window":obj) + "." + prop + " = " + val);
+    profile$log(loc + ": fetch/store " + (obj===window?"window":(obj===document?"document":obj)) + "." + prop + " = " + val);
     if (profile$is_object(obj))
     {
         profile$fetch_prop_aux(loc, obj, prop);
@@ -610,14 +613,14 @@ function profile$fetch_store_prop(loc, obj, prop, val)
 
 function profile$fetch_prop(loc, obj, prop)
 {
-    profile$log(loc + ": fetch " + (obj===window?"window":obj) + "." + prop);
+    profile$log(loc + ": fetch " + (obj===window?"window":(obj===document?"document":obj)) + "." + prop);
     if (profile$is_object(obj))
         profile$fetch_prop_aux(loc, obj, prop);
 }
 
 function profile$store_prop(loc, obj, prop, val)
 {
-    profile$log(loc + ": store " + (obj===window?"window":obj) + "." + prop + " = " + val);
+    profile$log(loc + ": store " + (obj===window?"window":(obj===document?"document":obj)) + "." + prop + " = " + val);
     if (profile$is_object(obj))
         profile$store_prop_aux(loc, obj, prop, val);
 }
@@ -854,7 +857,7 @@ function profile$set_var_mod(loc, val)
 
 function profile$call_prop(loc, obj, prop)
 {
-    profile$log(loc + ": call " + (obj===window?"window":obj) + "." + prop);
+    profile$log(loc + ": call " + (obj===window?"window":(obj===document?"document":obj)) + "." + prop);
     if (profile$is_object(obj))
         profile$fetch_prop_aux(loc, obj, prop);
 //    if (obj === undefined) {
