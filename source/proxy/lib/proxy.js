@@ -1,4 +1,6 @@
+var net      = require('net');
 var http     = require('http');
+var https    = require('https');
 var path     = require('path');
 var jsdom    = require('jsdom');
 var fs       = require('fs');
@@ -11,8 +13,14 @@ var js2js    = require('js2js');
 var DEBUG = false;
 
 var options = {
+    httpPort: 8080,
+    httpsPort: 8081,
+    httpsProxyPort: 8443,
     recordSource: false,
     js2jsOptions: {profile: true, debug: true},
+
+    key: fs.readFileSync('./data/key.pem'),
+    cert: fs.readFileSync('./data/cert.pem'),
 };
 
 jsdom.defaultDocumentFeatures = {
@@ -80,7 +88,9 @@ function merge(chunks) {
     return buffers.concat.apply(null, chunks);
 }
 
-function parseURL(url) {
+function parseURL(url, protocol) {
+    if (protocol === undefined) protocol = http;
+
     var urlparts = URL.parse(url);
     urlparts.fullpath = urlparts.pathname;
     if (urlparts.search) {
@@ -93,7 +103,7 @@ function parseURL(url) {
     if (urlparts.port) {
         urlparts.port = parseFloat(urlparts.port);
     } else {
-        urlparts.port = 80;
+        urlparts.port = protocol === https ? 443 : 80;
     }
     return urlparts;
 }
@@ -313,15 +323,26 @@ ProxyHandler.prototype.accepts = function (request) {
     return true;
 };
 
-ProxyHandler.prototype.process = function (request, response) {
+ProxyHandler.prototype.process = function (request, response, proxyObj) {
     var handler = this;
+    var protocol = proxyObj.protocol;
 
-    var url = parseURL(request.url);
-    var proxy = http.createClient(url.port, url.hostname);
+    var url = parseURL(request.url, protocol);
     delete request.headers['accept-encoding'];
-    var proxy_request = proxy.request(request.method, url.fullpath, request.headers);
+    var requestOptions = {
+        host: url.hostname,
+        port: url.port,
+        path: url.fullpath,
+        method: url.method,
+        headers: request.headers,
+        agent: new protocol.Agent({ host: url.hostname, port: url.port, maxSockets: 1 }),
+        key: options.key,   // for https
+        cert: options.cert, // for https
+    };
 
-    proxy_request.on('response', function (proxy_response) {
+    var proxy_request = protocol.request(requestOptions, requestHandler);
+    
+    function requestHandler(proxy_response) {
         var chunks = [];
 
         debug(request.url + " -> " + getProperty(proxy_response.headers, "content-type", "?"));
@@ -351,7 +372,7 @@ ProxyHandler.prototype.process = function (request, response) {
             }
             response.end();
         });
-    });
+    }
 
     request.addListener('data', function(chunk) {
         proxy_request.write(chunk, 'binary');
@@ -364,18 +385,65 @@ ProxyHandler.prototype.process = function (request, response) {
 
 // ----- Server -----
 
-function createProxyServer(handlers) {
-    return http.createServer(function(request, response) {
-        for (var i = 0; i < handlers.length; i++) {
-            var handler = handlers[i];
-            if (handler.accepts(request)) {
-                info("[" + handler.name + "]: "  + request.method + " " + request.url);
-                handler.process(request, response);
-                break;
-            }
+function Proxy(protocol, handlers) {
+    this.protocol = protocol;
+    this.handlers = handlers;
+}
+
+Proxy.prototype.process = function (request, response) {
+    for (var i = 0; i < this.handlers.length; i++) {
+        var handler = this.handlers[i];
+        if (handler.accepts(request)) {
+            info("[" + handler.name + "]: "  + request.method + " " + request.url);
+            handler.process(request, response, this);
+            break;
         }
+    }
+}
+
+function createHTTPProxy(handlers) {
+    var proxy = new Proxy(http, handlers);
+
+    return http.createServer(function(request, response) {
+        proxy.process(request, response);
     });
 }
+
+function createHTTPSProxy(handlers) {
+    var proxy = new Proxy(https, handlers);
+    var serverOptions = {
+        key: options.key,
+        cert: options.cert,
+    };
+
+    return https.createServer(serverOptions, function(request, response) {
+        proxy.process(request, response);
+    });
+}
+
+// Crude support for HTTP CONNECT protocol
+
+var connect_handler = net.createServer(function (client) {
+    function initiateConnection(data) {
+        // console.log("< " + data);
+        if (data.toString().slice(0, 7) === "CONNECT") {
+            client.removeListener('data', initiateConnection);
+            debug("Establishing SSL connection");
+            var server = net.createConnection(options.httpsPort);
+
+            client.write("HTTP/1.1 200 Connection established\r\n");
+            client.write("\r\n");
+
+            // client.on('end', function () { console.log("Client done"); });
+            // server.on('end', function () { client.destroy(); console.log("Server done"); });
+
+            client.pipe(server);
+            server.pipe(client);
+        } 
+    }
+
+    client.on('data', initiateConnection);
+});
 
 function parseCmdLine(argv) {
     if (argv.length <= 2) return;
@@ -391,7 +459,7 @@ function parseCmdLine(argv) {
 
 parseCmdLine(process.argv);
 
-createProxyServer([
+var proxy_handlers = [
     js2jsHandler,
     scriptSourceHandler,
     profileOutputHandler, 
@@ -399,4 +467,19 @@ createProxyServer([
         htmlHandler,
         jsHandler
     ]),
-]).listen(8080);
+];
+
+createHTTPProxy(proxy_handlers).listen(options.httpPort);
+createHTTPSProxy(proxy_handlers).listen(options.httpsPort);
+// https.createServer({
+//     key: options.key,
+//     cert: options.cert,
+//     agent: false,
+// },
+// function (req, res) {
+//     res.writeHead(200, {
+//         "content-type": "text/html",
+//     });
+//     res.end("<html></html>\r\n\r\n");
+// }).listen(options.httpsPort);
+connect_handler.listen(options.httpsProxyPort);
