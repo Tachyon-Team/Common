@@ -611,10 +611,6 @@ function profile$send_script(source, filename)
     }
 }
 
-var window = { SetTimeout: function (a,t) { if (!(typeof a === "function")) a = Function(""+a); a(); },
-               SetInterval: function (a,t) { if (!(typeof a === "function")) a = Function(""+a); a(); }
-             };
-
 var profile$window = this.window;
 var profile$document = this.document;
 
