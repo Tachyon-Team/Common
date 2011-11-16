@@ -44,6 +44,9 @@ function profile$print(str)
 
 var profile$output = new profile$String_output_port();
 
+var profile$temp = undefined;
+var profile$call_loc = "unknown";
+
 var profile$nesting = -1;
 var profile$stack = [];
 var profile$object_infos = [];
@@ -503,6 +506,11 @@ function profile$NewExpr_hook(loc, val)
     return val;
 }
 
+function profile$set_call_loc(loc)
+{
+    profile$call_loc = loc;
+}
+
 function profile$CallExpr_hook(loc, val)
 {
     return val;
@@ -548,14 +556,11 @@ function profile$EvalExpr_hook(loc, val)
     return val;
 }
 
-function profile$send_script(source, filename)
+var profile$global_eval = eval;
+
+function profile$eval(expr)
 {
-    var http = new XMLHttpRequest();
-    http.open("POST", "proxy$scriptSource?filename="+filename, true);
-    http.setRequestHeader("Content-type", "application/javascript");
-    http.setRequestHeader("Content-length", source.length);
-    http.setRequestHeader("Connection", "close");
-    http.send(source);
+    return profile$global_eval(profile$instrument_hook("global", expr));
 }
 
 function profile$instrument_hook(loc, expr)
@@ -587,6 +592,64 @@ function profile$instrument_hook(loc, expr)
     return new_expr;
 }
 
+function profile$send_script(source, filename)
+{
+    if (profile$XMLHttpRequest !== undefined)
+    {
+        var http = new profile$XMLHttpRequest();
+        http.open("POST", "proxy$scriptSource?filename="+filename, true);
+        http.setRequestHeader("Content-type", "application/javascript");
+        http.setRequestHeader("Content-length", source.length);
+        http.setRequestHeader("Connection", "close");
+        http.send(source);
+    }
+    else
+    {
+        profile$print("=========================== SCRIPT "+filename);
+        profile$print(source);
+        profile$print("===========================");
+    }
+}
+
+var window = { SetTimeout: function (a,t) { if (!(typeof a === "function")) a = Function(""+a); a(); },
+               SetInterval: function (a,t) { if (!(typeof a === "function")) a = Function(""+a); a(); }
+             };
+
+var profile$window = this.window;
+var profile$document = this.document;
+
+function object_familiar_name(obj)
+{
+    if (profile$window !== undefined && profile$window === obj)
+        return "window";
+    if (profile$document !== undefined && profile$document === obj)
+        return "document";
+    return obj.toString();
+}
+
+if (profile$window !== undefined)
+{
+    var profile$SetTimeout = window.SetTimeout;
+
+    window.SetTimeout = function (action, time) // TODO: maybe SetTimeout is in the prototype?
+    {
+        if (typeof action !== "function")
+            action = profile$instrument_hook(profile$call_loc, ""+action);
+        return profile$SetTimeout.call(this, action, time);
+    };
+
+    var profile$SetInterval = window.SetInterval;
+
+    window.SetInterval = function (action, time) // TODO: maybe SetInterval is in the prototype?
+    {
+        if (typeof action !== "function")
+            action = profile$instrument_hook(profile$call_loc, ""+action);
+        return profile$SetInterval.call(this, action, time);
+    };
+
+    var profile$XMLHttpRequest = window.XMLHttpRequest;
+}
+
 function profile$access_prop_tp(loc, obj)
 {
     var descr = profile$prop_access_abstypes[loc];
@@ -603,7 +666,7 @@ function profile$access_prop_tp(loc, obj)
 
 function profile$fetch_store_prop(loc, obj, prop, val)
 {
-    profile$log(loc + ": fetch/store " + (obj===window?"window":(obj===document?"document":obj)) + "." + prop + " = " + val);
+    profile$log(loc + ": fetch/store " + object_familiar_name(obj) + "." + prop + " = " + val);
     if (profile$is_object(obj))
     {
         profile$fetch_prop_aux(loc, obj, prop);
@@ -613,14 +676,14 @@ function profile$fetch_store_prop(loc, obj, prop, val)
 
 function profile$fetch_prop(loc, obj, prop)
 {
-    profile$log(loc + ": fetch " + (obj===window?"window":(obj===document?"document":obj)) + "." + prop);
+    profile$log(loc + ": fetch " + object_familiar_name(obj) + "." + prop);
     if (profile$is_object(obj))
         profile$fetch_prop_aux(loc, obj, prop);
 }
 
 function profile$store_prop(loc, obj, prop, val)
 {
-    profile$log(loc + ": store " + (obj===window?"window":(obj===document?"document":obj)) + "." + prop + " = " + val);
+    profile$log(loc + ": store " + object_familiar_name(obj) + "." + prop + " = " + val);
     if (profile$is_object(obj))
         profile$store_prop_aux(loc, obj, prop, val);
 }
@@ -857,7 +920,7 @@ function profile$set_var_mod(loc, val)
 
 function profile$call_prop(loc, obj, prop)
 {
-    profile$log(loc + ": call " + (obj===window?"window":(obj===document?"document":obj)) + "." + prop);
+    profile$log(loc + ": call " + object_familiar_name(obj) + "." + prop);
     if (profile$is_object(obj))
         profile$fetch_prop_aux(loc, obj, prop);
 //    if (obj === undefined) {
@@ -872,7 +935,9 @@ function profile$call_prop(loc, obj, prop)
     var args = [];
     for (var i=3; i<arguments.length; i++)
         args.push(arguments[i]);
-    return f.apply(obj, args);
+    profile$call_loc = loc;
+    var result = f.apply(obj, args);
+    return result;
 }
 
 function profile$log(text)
@@ -882,12 +947,15 @@ function profile$log(text)
 
 function profile$send_output(text)
 {
-    var http = new XMLHttpRequest();
-    http.open("POST", "profile_output", true);
-    http.setRequestHeader("Content-type", "text/html");
-    http.setRequestHeader("Content-length", text.length);
-    http.setRequestHeader("Connection", "close");
-    http.send(text);
+    if (profile$XMLHttpRequest !== undefined)
+    {
+        var http = new profile$XMLHttpRequest();
+        http.open("POST", "profile_output", true);
+        http.setRequestHeader("Content-type", "text/html");
+        http.setRequestHeader("Content-length", text.length);
+        http.setRequestHeader("Connection", "close");
+        http.send(text);
+    }
 }
 
 function profile$dump()

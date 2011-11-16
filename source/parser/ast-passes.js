@@ -320,7 +320,7 @@ function Variable(tok, is_param, is_declared, scope)
     this.is_param    = is_param;
     this.is_declared = is_declared;
     this.scope       = scope;
-    this.special     = false; // can be false, "eval" or "arguments"
+    this.special     = false; // can be false, "eval", "arguments" or "Function"
 }
 
 Variable.prototype.toString = function ()
@@ -575,6 +575,7 @@ var_resolution_pass_ctx.prototype.walk_statement = function (ast)
 
         set_special("eval");
         set_special("arguments");
+        set_special("Function");
 
         return ast;
     }
@@ -820,6 +821,7 @@ profiling_pass_ctx.prototype.walk_expr = function (ast)
         else
         {
             ast.fn = this.walk_expr(ast.fn);
+            // TODO: check if calling "Function"
             return this.call_hook("profile$CallExpr_hook",
                                   ast.loc,
                                   ast);
@@ -903,6 +905,7 @@ profiling_pass_ctx.prototype.walk_expr = function (ast)
     }
     else if (ast instanceof NewExpr)
     {
+        // TODO: check if "new Function"
         return this.call_hook("profile$NewExpr_hook",
                               ast.loc,
                               ast_walk_expr(ast, this));
@@ -944,6 +947,14 @@ profiling_pass_ctx.prototype.walk_expr = function (ast)
                               ast_walk_expr(ast, this));
     }
 */
+    else if (ast instanceof Ref &&
+             ast.id.special === "eval")
+    {
+        var prof_eval_tok = new Token(IDENT_CAT, "profile$eval", ast.loc);
+        var prof_eval_var = resolve_var(this.prog, prof_eval_tok);
+        ast.id = prof_eval_var;
+        return ast;
+    }
     else if (ast instanceof This)
     {
         return this.call_hook("profile$This_hook",
