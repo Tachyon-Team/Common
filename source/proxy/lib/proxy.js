@@ -119,7 +119,7 @@ function instrument_js(data, filename) {
 
 function recordSource(scriptSource, filename) {
     if (options.recordSource) {
-        fs.writeFileSync(filename, scriptSource);
+        fs.writeFileSync("output/"+filename, scriptSource);
     }
 }
 
@@ -244,7 +244,7 @@ var profileOutputHandler = {
         });
 
         request.addListener('end', function() {
-            fs.writeFileSync("profile.out", merge(chunks));
+            fs.writeFileSync("output/profile", merge(chunks));
             response.writeHead(200, { 'Content-Type': 'text/plain' });
             response.end("done\n");
         });
