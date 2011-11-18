@@ -329,7 +329,7 @@ Object.prototype.valueOf = function ()
 */
 Object.prototype.hasOwnProperty = function (prop)
 {
-    return hasOwnPropVal(this, prop);
+    return hasOwnProp(this, prop);
 };
 
 /**

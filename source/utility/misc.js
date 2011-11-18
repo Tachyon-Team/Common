@@ -74,9 +74,9 @@ function isPowerOf2(x)
 }
 
 /**
-Find the highest bit set to 1 in an integer
+Find the index of the highest bit set to 1 in an integer
 */
-function highestBit(x)
+function highestBitIdx(x)
 {
     assert (
         num_instance(x) || Math.floor(x) === x,
@@ -92,6 +92,22 @@ function highestBit(x)
     }
 
     return ret;
+}
+
+/**
+Get the value of the highest bit set to 1 in an integer
+*/
+function highestBit(x)
+{
+    return num_shift(1, highestBitIdx(x));
+}
+
+/**
+Get the value of the lowest bit set to 1 in an integer
+*/
+function lowestBit(x)
+{
+    return num_and(x, num_neg(x));
 }
 
 /**
