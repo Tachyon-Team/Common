@@ -111,6 +111,29 @@ function lowestBit(x)
 }
 
 /**
+Compute the next power of 2 greater than x
+*/
+function nextPowerOf2(x)
+{
+    assert (
+        num_instance(x) || Math.floor(x) === x,
+        'value must be integer'
+    );
+
+    var bits = num_add(x, 0);
+
+    for (var sft = 1;; sft *= 2)
+    {
+        bits = num_or(bits, num_shift(bits, -sft));
+
+        if (num_eq(num_shift(x, -sft), 0))
+            break;
+    }
+
+    return num_add(bits, 1);
+}
+
+/**
 Calculate the minimum value an integer variable can store. Signed
 values are assumed to use the 2s complement representation.
 */
