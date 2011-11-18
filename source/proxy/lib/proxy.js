@@ -21,6 +21,8 @@ var options = {
 
     key: fs.readFileSync('./data/key.pem'),
     cert: fs.readFileSync('./data/cert.pem'),
+
+    outputDir: "output",
 };
 
 jsdom.defaultDocumentFeatures = {
@@ -129,16 +131,61 @@ function instrument_js(data, filename) {
 
 function recordSource(scriptSource, filename) {
     if (options.recordSource) {
-        fs.writeFileSync("output/"+filename, scriptSource);
+        var d = options.outputDir;
+        try {
+            var stat = fs.statSync(d);
+            if (!stat.isDirectory()) throw "Output directory exists, but is not a directory";
+        } catch (e) {
+            fs.mkdirSync(d, 0755);
+        }
+        fs.writeFileSync(d + "/" + filename, scriptSource);
     }
 }
 
 var htmlHandler = {
     pageCount: 0,
 
+    htmlEvents: [
+        "onload",
+        "onunload",
+
+        "onblur",
+        "onchange",
+        "onfocus",
+        "onreset",
+        "onselect",
+        "onsubmit",
+
+        "onabort",
+
+        "onkeydown",
+        "onkeypress",
+        "onkeyup",
+
+        "onclick",
+        "ondblclick",
+        "onmousedown",
+        "onmousemove",
+        "onmouseout",
+        "onmouseover",
+        "onmouseup",
+    ],
+
     accepts: function (request, response) {
         var content_type = getProperty(response.headers, "content-type", "");
         return str_startsWith(content_type, "text/html");
+    },
+
+    traverseDOM: function (root, f) {
+        if (!f) return;
+        if (!root) return;
+
+        f(root);
+        var children = root.childNodes;
+        for (var i = 0; i < children.length; i++) {
+            var child = children[i];
+            this.traverseDOM(child, f);
+        }
     },
 
     process: function (request, response, data) {
@@ -149,19 +196,39 @@ var htmlHandler = {
 
         // Instrument existing scripts
         var scripts = document.getElementsByTagName('script');
-        var count = 0;
-        if (scripts.length) {
-            this.pageCount++;
-        }
+        var filename = "page" + this.pageCount++;
         for (var i = 0; i < scripts.length; i++) {
             var e = scripts[i];
             if (!e.hasAttribute('src')) {
                 var src = decodeEntities(e.innerHTML + "\n")
-                var filename = "page" + this.pageCount + "$" + i + ".js";
-                var script = instrument_js(src, filename);
+                var script = instrument_js(src, filename + "$" + i + ".js");
                 e.innerHTML = encodeEntities(script);
             }
         }
+
+        var self = this;
+
+
+        var eventCount = 0;
+        // Instrument JS found in tag attributes
+        this.traverseDOM(window.document, function (node) {
+            if (! ("hasAttribute" in node)) {
+                return; // Skip text nodes etc.
+            }
+            for (var i = 0; i < self.htmlEvents.length; i++) {
+                var e = self.htmlEvents[i];
+                if (node.hasAttribute(e)) {
+                    var code = node.getAttribute(e);
+                    var prefix = "";
+                    if (str_startsWith(code, "javascript:")) {
+                        code = code.slice(11);
+                        prefix = "javascript:";
+                    }
+                    code = prefix + instrument_js(code + "\n", filename + "$" + e + eventCount++ + ".js");
+                    node.setAttribute(e, code.replace(/[\n\r]+/g, ""));
+                }
+            }
+        });
 
         var container;
         if (document.head) {
@@ -183,7 +250,7 @@ var htmlHandler = {
         var a = document.createElement('a');
         a.setAttribute("href", "javascript:void(0);");
         a.setAttribute("onclick", "javascript:profile$dump();");
-        a.setAttribute("style", "position: absolute; top: 40px; left: 0; border: 0; color: #77777; z-index: 100;");
+        a.setAttribute("style", "position: absolute; top: 40px; left: 0; border: 0; color: #777777; z-index: 100;");
         a.innerHTML = 'Send profile';
         document.body.insertBefore(a, document.body.children[0]);
 
@@ -254,7 +321,7 @@ var profileOutputHandler = {
         });
 
         request.addListener('end', function() {
-            fs.writeFileSync("output/profile", merge(chunks));
+            fs.writeFileSync(options.outputDir + "/profile", merge(chunks));
             response.writeHead(200, { 'Content-Type': 'text/plain' });
             response.end("done\n");
         });
@@ -449,8 +516,11 @@ function parseCmdLine(argv) {
     if (argv.length <= 2) return;
 
     for (var i = 2; i < argv.length; i++) {
-        if (argv[i] === "--record-js") {
+        var arg = argv[i];
+        if (arg === "--record-js") {
             options.recordSource = true;
+        } else if (arg === "-d" || arg === "--output-dir") {
+            options.outputDir = argv[++i];
         } else {
             throw "Unrecognized option: " + argv[i];
         }
