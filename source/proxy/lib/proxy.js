@@ -21,6 +21,8 @@ var options = {
 
     key: fs.readFileSync('./data/key.pem'),
     cert: fs.readFileSync('./data/cert.pem'),
+
+    outputDir: "output",
 };
 
 jsdom.defaultDocumentFeatures = {
@@ -129,7 +131,14 @@ function instrument_js(data, filename) {
 
 function recordSource(scriptSource, filename) {
     if (options.recordSource) {
-        fs.writeFileSync("output/"+filename, scriptSource);
+        var d = options.outputDir;
+        try {
+            var stat = fs.statSync(d);
+            if (!stat.isDirectory()) throw "Output directory exists, but is not a directory";
+        } catch (e) {
+            fs.mkdirSync(d, 0755);
+        }
+        fs.writeFileSync(d + "/" + filename, scriptSource);
     }
 }
 
@@ -254,7 +263,7 @@ var profileOutputHandler = {
         });
 
         request.addListener('end', function() {
-            fs.writeFileSync("output/profile", merge(chunks));
+            fs.writeFileSync(options.outputDir + "/profile", merge(chunks));
             response.writeHead(200, { 'Content-Type': 'text/plain' });
             response.end("done\n");
         });
@@ -449,8 +458,11 @@ function parseCmdLine(argv) {
     if (argv.length <= 2) return;
 
     for (var i = 2; i < argv.length; i++) {
-        if (argv[i] === "--record-js") {
+        var arg = argv[i];
+        if (arg === "--record-js") {
             options.recordSource = true;
+        } else if (arg === "-d" || arg === "--output-dir") {
+            options.outputDir = argv[++i];
         } else {
             throw "Unrecognized option: " + argv[i];
         }
