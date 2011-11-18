@@ -122,7 +122,14 @@ function instrument_js(data, filename) {
     }
     recordSource(data, filename);
     options.js2jsOptions.filename = filename;
-    var script = js2js.instrument(data, options.js2jsOptions);
+    try {
+        var script = js2js.instrument(data, options.js2jsOptions);
+    } catch (e) {
+        console.log("Failed to instrument code:");
+        console.log(data);
+        console.log("--------------------");
+        throw e;
+    }
     if (prefix !== null) {
         script = prefix + script;
     }
@@ -433,6 +440,22 @@ ProxyHandler.prototype.process = function (request, response, proxyObj) {
                 buffer = data;
             }
             proxy_response.headers["content-length"] = String(buffer.length);
+
+            // Disable caching
+            var cache_control = [];
+            if ("cache-control" in proxy_response.headers) {
+                var cache_control = proxy_response.headers["cache-control"].split(",");
+                for (var i = cache_control.length-1; i >= 0; i--) {
+                    var value = cache_control[i].trim();
+                    if (value === "public" || value === "private") {
+                        delete cache_control[i];
+                    }
+                }
+            }
+            cache_control.push("no-cache");
+            cache_control.push("must-revalidate");
+            proxy_response.headers["cache-control"] = cache_control.join(",");
+
             response.writeHead(proxy_response.statusCode, proxy_response.headers);
             if (buffer.length > 0) {
                 response.write(buffer);
