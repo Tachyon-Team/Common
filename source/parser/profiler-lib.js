@@ -620,6 +620,10 @@ function object_familiar_name(obj)
         return "window";
     if (profile$document !== undefined && profile$document === obj)
         return "document";
+    if (typeof obj === "object" && obj instanceof Array)
+        return "some_array";
+    if (typeof obj === "function")
+        return "some_" + typeof obj;
     return obj.toString();
 }
 
@@ -645,6 +649,32 @@ if (profile$window !== undefined)
 
     var profile$XMLHttpRequest = window.XMLHttpRequest;
 }
+
+var profile$Function_orig = Function;
+
+function profile$Function()
+{
+    var len = arguments.length;
+    var params = [];
+    var body;
+
+    if (len === 0)
+        body = "";
+    else
+    {
+        body = arguments[len-1];
+
+        for (var i=0; i<len-1; i++)
+            params.push(arguments[i]);
+    }
+
+    var expr = "(function (" + params.join(",") + ") { " + body + " })";
+    var instrumented_expr = profile$instrument_hook("Function", expr);
+
+    return profile$global_eval(instrumented_expr);
+}
+
+Function = profile$Function;
 
 function profile$access_prop_tp(loc, obj)
 {
