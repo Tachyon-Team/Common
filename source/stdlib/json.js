@@ -526,6 +526,9 @@ JSON.stringify = function (
         depth
     )
     {
+        if (o === null)
+            return 'null';
+
         var keys;
 
         if (propertyList === undefined)

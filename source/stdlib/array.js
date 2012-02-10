@@ -64,14 +64,14 @@ function Array(len)
         arguments.length === 1)
     {
         // Allocate an array of the desired capacity and set its length
-        var a = newArray(unboxInt(len));
+        var a = iir.blank_array(len);
         a.length = len;
 
         return a;
     }
 
     // Allocate an array of the desired capacity and set its length
-    var a = newArray(unboxInt(arguments.length));
+    var a = iir.blank_array(arguments.length);
     a.length = arguments.length;
 
     // Copy the arguments into the array

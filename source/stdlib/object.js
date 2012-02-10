@@ -133,7 +133,7 @@ FIXME: for now, no property attributes
 Object.getOwnPropertyDescriptor = function (O, P)
 {
     if (boxIsObjExt(O) === false)
-        throw TypeError('invalid object');
+        typeError('invalid object in getOwnPropertyDescriptor');
 
     name = boxToString(P);
 
@@ -146,7 +146,7 @@ Object.getOwnPropertyDescriptor = function (O, P)
 Object.getOwnPropertyNames = function (O)
 {
     if (boxIsObjExt(O) === false)
-        throw TypeError('invalid object');
+        typeError('invalid object in getOwnPropertyNames');
 
     var propNames = [];
 
@@ -166,10 +166,7 @@ Object.create = function (O, Properties)
 {
     if (boxIsObjExt(O) === false && obj !== null)
     {
-        throw makeError(
-            TypeError, 
-            'can only create object from object or null prototype'
-        );
+        typeError('can only create object from object or null prototype');
     }
 
     var newObj = newObject(O);
@@ -201,7 +198,7 @@ Object.defineProperty = function (obj, prop, attribs)
 Object.defineProperties = function (O, Properties)
 {
     if (boxIsObjExt(O) === false)
-        throw TypeError('invalid object');
+        typeError('invalid object in defineProperties');
 
     for (name in Properties)
     {
@@ -216,7 +213,7 @@ FIXME: noop function for now
 Object.seal = function (O)
 {
     if (boxIsObjExt(O) === false)
-        throw TypeError('invalid object');
+        typeError('invalid object in seal');
 
     return O;
 }
@@ -228,7 +225,7 @@ FIXME: noop function for now
 Object.freeze = function (O)
 {
     if (boxIsObjExt(O) === false)
-        throw TypeError('invalid object');
+        typeError('invalid object in freeze');
 
     return O;
 }
@@ -240,7 +237,7 @@ FIXME: noop function for now
 Object.preventExtensions = function (O)
 {
     if (boxIsObjExt(O) === false)
-        throw TypeError('invalid object');
+        typeError('invalid object in preventExtensions');
 
     return O;
 }
@@ -252,7 +249,7 @@ FIXME: noop function for now
 Object.isSealed = function (O)
 {
     if (boxIsObjExt(O) === false)
-        throw TypeError('invalid object');
+        typeError('invalid object in isSealed');
 
     return false; 
 }
@@ -264,7 +261,7 @@ FIXME: for now, all objects are extensible
 Object.isFrozen = function (O)
 {
     if (boxIsObjExt(O) === false)
-        throw TypeError('invalid object');
+        typeError('invalid object in isFrozen');
 
     return false;
 };
@@ -276,7 +273,7 @@ FIXME: for now, all objects are extensible
 Object.isExtensible = function (O)
 {
     if (boxIsObjExt(O) === false)
-        throw TypeError('invalid object');
+        typeError('invalid object in isExtensible');
 
     return true;
 };
@@ -287,7 +284,7 @@ Object.isExtensible = function (O)
 Object.keys = function (O)
 {
     if (boxIsObjExt(O) === false)
-        throw TypeError('invalid object');
+        typeError('invalid object in keys');
 
     var propNames = [];
 

@@ -118,13 +118,13 @@ Function.prototype.toString = function ()
 Function.prototype.apply = function (thisArg, argArray)
 {
     if (boxIsFunc(this) === false)
-        throw makeError(TypeError, 'apply on non-function');
+        typeError('apply on non-function');
 
     if (argArray === null || argArray === UNDEFINED)
         argArray = [];
 
     if (boxIsArray(argArray) === false)
-        throw makeError(TypeError, 'invalid arguments array');
+        typeError('invalid arguments array');
 
     // Get the function pointer for the function
     var funcPtr = get_clos_funcptr(this);

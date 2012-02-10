@@ -60,3 +60,12 @@ function print(val)
     printBox(val);
 }
 
+/**
+Type assertion function used to test the type analysis.
+This definition is a placeholder and has no effect outside
+of the type analysis.
+*/
+function typeAssert(val, test)
+{
+}
+

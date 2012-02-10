@@ -56,8 +56,6 @@ Math object (see ECMAScript 5 18.8)
 */
 var Math = {};
 
-// TODO: set [[Class]] internal property of the Math object to "Math"
-
 /**
 15.8.2.1 abs (x)
 Returns the absolute value of x; the result has the same magnitude as x
