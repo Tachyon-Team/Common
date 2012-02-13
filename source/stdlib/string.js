@@ -79,11 +79,6 @@ function String(value)
 }
 
 /**
-15.5.3.1 String prototype object
-*/
-String.prototype = {};
-
-/**
 Anonymous function to initialize this library
 */
 (function ()

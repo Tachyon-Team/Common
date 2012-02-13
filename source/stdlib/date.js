@@ -546,11 +546,6 @@ function Date (
 }
 
 /**
-   15.9.4.1 The Date prototype object
-*/
-Date.prototype = {};
-
-/**
    15.9.5.1 Date.prototype.constructor
 */
 Date.prototype.constructor = Date;

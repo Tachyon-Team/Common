@@ -82,11 +82,6 @@ function Object(value)
 Object.length = 1;
 
 /**
-15.2.3.1 Object prototype object
-*/
-Object.prototype = {};
-
-/**
 15.2.4.1 Object.prototype.constructor
 */
 Object.prototype.constructor = Object;

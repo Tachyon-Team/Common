@@ -77,11 +77,6 @@ function Boolean(value)
 }
 
 /**
-15.6.3.1 Boolean prototype object
-*/
-Boolean.prototype = {};
-
-/**
 Anonymous function to initialize this library
 */
 (function ()

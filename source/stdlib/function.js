@@ -59,11 +59,6 @@ function Function()
     // TODO
 }
 
-/**
-15.3.3.1 Function prototype object
-*/
-Function.prototype = {};
-
 Function.prototype.length = 0;
 
 /**

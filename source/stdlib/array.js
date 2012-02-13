@@ -82,11 +82,6 @@ function Array(len)
 }
 
 /**
-15.4.3.1 Array prototype object
-*/
-Array.prototype = {};
-
-/**
 Anonymous function to initialize this library
 */
 (function ()

@@ -77,11 +77,6 @@ function Number(value)
 }
 
 /**
-15.7.3.1 Number prototype object
-*/
-Number.prototype = {};
-
-/**
 Anonymous function to initialize this library
 */
 (function ()
