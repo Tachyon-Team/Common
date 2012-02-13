@@ -133,7 +133,7 @@ Object.getOwnPropertyDescriptor = function (O, P)
     name = boxToString(P);
 
     return { writable:true, enumerable:true, configurable: true, value: O[name] };
-}
+};
 
 /**
 15.2.3.4 Get the named own properties of an object (excludes the prototype chain)
@@ -152,7 +152,7 @@ Object.getOwnPropertyNames = function (O)
     }
 
     return propNames;
-}
+};
 
 /**
 15.2.3.5 Object.create ( O [, Properties] )
@@ -199,7 +199,7 @@ Object.defineProperties = function (O, Properties)
     {
         Object.defineProperty(O, name, Properties[name]);
     }
-}
+};
 
 /**
 15.2.3.8 Object.seal ( O )
@@ -211,7 +211,7 @@ Object.seal = function (O)
         typeError('invalid object in seal');
 
     return O;
-}
+};
 
 /**
 15.2.3.9 Object.freeze ( O )
@@ -223,7 +223,7 @@ Object.freeze = function (O)
         typeError('invalid object in freeze');
 
     return O;
-}
+};
 
 /**
 15.2.3.10 Object.preventExtensions ( O )
@@ -235,7 +235,7 @@ Object.preventExtensions = function (O)
         typeError('invalid object in preventExtensions');
 
     return O;
-}
+};
 
 /**
 15.2.3.11 Object.isSealed ( O )
@@ -247,7 +247,7 @@ Object.isSealed = function (O)
         typeError('invalid object in isSealed');
 
     return false; 
-}
+};
 
 /**
 15.2.3.12 Object.isFrozen ( O )
@@ -290,7 +290,7 @@ Object.keys = function (O)
     }
 
     return propNames;
-}
+};
 
 /**
 15.2.4.2 Default object to string conversion function
@@ -344,5 +344,5 @@ Object.prototype.propertyIsEnumerable = function (V)
         return false;
 
     return true;
-}
+};
 
