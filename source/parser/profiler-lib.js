@@ -614,14 +614,16 @@ function profile$send_script(source, filename)
     }
 }
 
-function profile$send_innerHTML(source, filename)
+function profile$send_innerHTML(source, mode, filename)
 {
     if (profile$XMLHttpRequest !== undefined)
     {
         var http = new profile$XMLHttpRequest();
         var url = "proxy$innerHTML";
+        if (mode === undefined) mode = "html";
+        url = url + "?mode=" + mode;
         if (filename !== undefined) {
-            url = url + "?filename=" + filename;
+            url = url + "&filename=" + filename;
         }
         http.open("POST", url, false); // Synchronous AJAX request
         http.setRequestHeader("Content-type", "text/html");
@@ -864,9 +866,14 @@ function profile$put_prop(loc, obj, prop, val)
             obj["proxy$innerHTML_orig"] = val;
 
         if (obj.tagName.toLowerCase() === "script") {
-            alert("Assigning script text via innerHTML");
         }
-        val = profile$send_innerHTML(val);
+
+        var mode = "html";
+        if (obj.tagName.toLowerCase() === "script") {
+           mode = "js";
+        }
+
+        val = profile$send_innerHTML(val, mode);
     }
     var result = obj[prop] = val;
     profile$store_prop(loc, obj, prop, result);
@@ -878,8 +885,9 @@ function profile$put_prop_add(loc, obj, prop, val)
     var is_innerHTML = (prop === "innerHTML") && ("hasOwnProperty" in obj);
     if (is_innerHTML) {
         var innerhtml_orig;
-        if (obj.tagName === "script") {
-            alert("Assigning script text via innerHTML");
+        var mode = "html";
+        if (obj.tagName.toLowerCase() === "script") {
+           mode = "js";
         }
         if (obj.hasOwnProperty("proxy$innerHTML_orig")) {
             innerhtml_orig = obj["proxy$innerHTML_orig"];
@@ -889,7 +897,7 @@ function profile$put_prop_add(loc, obj, prop, val)
                     { enumerable: false, value: innerhtml_orig + val });
         }
         obj["proxy$innerHTML_orig"] = innerhtml_orig + val;
-        val = profile$send_innerHTML(val);
+        val = profile$send_innerHTML(val, mode);
     }
     var result = obj[prop] += val;
     if (is_innerHTML) {

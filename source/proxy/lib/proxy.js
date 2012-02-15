@@ -555,11 +555,19 @@ var innerHTMLHandler = {
 
         request.addListener('end', function() {
             var url = parseURL(request.url);
-            // var filename = url.query.replace('filename=', '');
+            var args = querystr.parse(url.query);
             var data = merge(chunks).toString("utf-8");
             var id = self.nextID++;
             //recordSource(data, "innerhtml" + id);
-            var instrumented_val = instrument_html(data, "innerhtml" + id);
+            var instrumented_val;
+            var content_type;
+            if (args.mode === "js") {
+                content_type = "text/javascript";
+                instrumented_val = instrument_js(data, "innerhtml" + id + ".js");
+            } else {
+                content_type = "text/html";
+                instrumented_val = instrument_html(data, "innerhtml" + id);
+            }
 
             var buffer;
             if (typeof instrumented_val === "string") {
@@ -570,7 +578,7 @@ var innerHTMLHandler = {
             //recordInstrumentedSource(data, "innerhtml" + id);
 
             response.writeHead(200, {
-                'Content-Type': 'text/html',
+                'Content-Type': content_type,
                 'content-length': String(buffer.length) 
 
             });
