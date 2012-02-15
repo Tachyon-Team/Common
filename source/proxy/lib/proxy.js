@@ -13,11 +13,16 @@ var js2js    = require('js2js');
 var DEBUG = false;
 
 var options = {
+    pacPort: 9000,
     httpPort: 8080,
     httpsPort: 8081,
     httpsProxyPort: 8443,
     recordSource: false,
-    js2jsOptions: {profile: true, debug: true},
+    recordInstrumentedSource: false,
+    js2jsOptions: {
+        profile: true,
+        debug: true,
+    },
 
     key: fs.readFileSync('./data/key.pem'),
     cert: fs.readFileSync('./data/cert.pem'),
@@ -110,9 +115,153 @@ function parseURL(url, protocol) {
     return urlparts;
 }
 
+function send_html(request, response, data, options) {
+    var buffer;
+    if (typeof data === "string") {
+        buffer = new Buffer(data);
+    } else {
+        buffer = data;
+    }
+    proxy_response.headers["content-length"] = String(buffer.length);
+
+    // Disable caching
+    var cache_control = [];
+    if ("cache-control" in proxy_response.headers) {
+        cache_control = proxy_response.headers["cache-control"].split(",");
+        for (var i = cache_control.length-1; i >= 0; i--) {
+            var value = cache_control[i].trim();
+            if (value === "public" || value === "private") {
+                delete cache_control[i];
+            }
+        }
+    }
+    cache_control.push("no-cache");
+    cache_control.push("must-revalidate");
+    proxy_response.headers["cache-control"] = cache_control.join(",");
+
+    response.writeHead(proxy_response.statusCode, proxy_response.headers);
+    if (buffer.length > 0) {
+        response.write(buffer);
+    }
+    response.end();
+}
+
 // ----- Response handlers -----
 
 var UNPARSEABLE_CRUFT = "throw 1; < don't be evil' >"; // For handling google XSS security stuff
+
+var htmlEvents = [
+    "onload",
+    "onunload",
+
+    "onblur",
+    "onchange",
+    "onfocus",
+    "onreset",
+    "onselect",
+    "onsubmit",
+
+    "onabort",
+
+    "onkeydown",
+    "onkeypress",
+    "onkeyup",
+
+    "onclick",
+    "ondblclick",
+    "onmousedown",
+    "onmousemove",
+    "onmouseout",
+    "onmouseover",
+    "onmouseup",
+];
+
+function traverseDOM(root, f) {
+    if (!f) return;
+    if (!root) return;
+
+    f(root);
+    var children = root.childNodes;
+    for (var i = 0; i < children.length; i++) {
+        var child = children[i];
+        traverseDOM(child, f);
+    }
+}
+
+function instrument_html(data, filename) {
+    if (!data) return data;
+
+    var window = jsdom.jsdom(data).createWindow();
+    var document = window.document;
+
+    // Instrument existing scripts
+    var scripts = document.getElementsByTagName('script');
+    for (var i = 0; i < scripts.length; i++) {
+        var e = scripts[i];
+        if (!e.hasAttribute('src')) {
+            var src = decodeEntities(e.innerHTML + "\n");
+            var script = instrument_js(src, filename + "$" + i + ".js");
+            e.innerHTML = encodeEntities(script);
+        }
+    }
+
+    var eventCount = 0;
+    // Instrument JS found in tag attributes
+    traverseDOM(document, function (node) {
+        if (! ("hasAttribute" in node)) {
+            return; // Skip text nodes etc.
+        }
+        for (var i = 0; i < htmlEvents.length; i++) {
+        var e = htmlEvents[i];
+            if (node.hasAttribute(e)) {
+                var code = node.getAttribute(e);
+                var prefix = "";
+                if (str_startsWith(code, "javascript:")) {
+                    code = code.slice(11);
+                    prefix = "javascript:";
+                }
+                code = prefix + instrument_js(code + "\n", filename + "$" + e + eventCount++ + ".js");
+                node.setAttribute(e, code.replace(/[\n\r]+/g, ""));
+            }
+        }
+    });
+
+    
+    var container;
+    if (document.head) {
+        container = document.head;
+    } else if (document.body) {
+        container = document.body;
+    } else {
+        // Guard against empty documents and fragments
+        return document.innerHTML;
+    }
+
+    var profiler_script = document.createElement('script');
+    profiler_script.setAttribute("type", "application/javascript");
+    profiler_script.setAttribute("src", "/js2js/profiler-lib.js");
+    container.insertBefore(profiler_script, container.children[0]);
+
+    var js2js_script = document.createElement('script');
+    js2js_script.setAttribute("type", "application/javascript");
+    js2js_script.setAttribute("src", "/js2js/js2js-lib.js");
+    container.insertBefore(js2js_script, container.children[0]);
+
+    var a = document.createElement('a');
+    a.setAttribute("id", "proxy_send_profile_link");
+    a.setAttribute("href", "javascript:void(0);");
+    a.setAttribute("onclick", "javascript:profile$dump();");
+    a.setAttribute("style", "position: absolute; top: 40px; left: 0; border: 0; color: #777777; z-index: 100;");
+    a.innerHTML = 'Send profile';
+    document.body.insertBefore(a, document.body.children[0]);
+
+    var html = document.innerHTML;
+    if (window.document.doctype) {
+        html = window.document.doctype + html;
+    }
+
+    return html;
+}
 
 function instrument_js(data, filename) {
     var prefix = null;
@@ -130,6 +279,7 @@ function instrument_js(data, filename) {
         console.log("--------------------");
         throw e;
     }
+    recordInstrumentedSource(script, filename);
     if (prefix !== null) {
         script = prefix + script;
     }
@@ -149,53 +299,29 @@ function recordSource(scriptSource, filename) {
     }
 }
 
+function recordInstrumentedSource(scriptSource, filename) {
+    if (options.recordInstrumentedSource) {
+        var d = options.outputDir;
+        try {
+            var stat = fs.statSync(d);
+            if (!stat.isDirectory()) throw "Output directory exists, but is not a directory";
+        } catch (e) {
+            fs.mkdirSync(d, 0755);
+        }
+        fs.writeFileSync(d + "/" + filename + ".instrumented", scriptSource);
+    }
+}
+
 var htmlHandler = {
     pageCount: 0,
-
-    htmlEvents: [
-        "onload",
-        "onunload",
-
-        "onblur",
-        "onchange",
-        "onfocus",
-        "onreset",
-        "onselect",
-        "onsubmit",
-
-        "onabort",
-
-        "onkeydown",
-        "onkeypress",
-        "onkeyup",
-
-        "onclick",
-        "ondblclick",
-        "onmousedown",
-        "onmousemove",
-        "onmouseout",
-        "onmouseover",
-        "onmouseup",
-    ],
 
     accepts: function (request, response) {
         var content_type = getProperty(response.headers, "content-type", "");
         return str_startsWith(content_type, "text/html");
     },
 
-    traverseDOM: function (root, f) {
-        if (!f) return;
-        if (!root) return;
-
-        f(root);
-        var children = root.childNodes;
-        for (var i = 0; i < children.length; i++) {
-            var child = children[i];
-            this.traverseDOM(child, f);
-        }
-    },
-
     process: function (request, response, data) {
+        return instrument_html(data, "page" + this.pageCount++);
         if (!data) return data;
 
         var window = jsdom.jsdom(data).createWindow();
@@ -207,7 +333,7 @@ var htmlHandler = {
         for (var i = 0; i < scripts.length; i++) {
             var e = scripts[i];
             if (!e.hasAttribute('src')) {
-                var src = decodeEntities(e.innerHTML + "\n")
+                var src = decodeEntities(e.innerHTML + "\n");
                 var script = instrument_js(src, filename + "$" + i + ".js");
                 e.innerHTML = encodeEntities(script);
             }
@@ -255,6 +381,7 @@ var htmlHandler = {
         container.insertBefore(js2js_script, container.children[0]);
 
         var a = document.createElement('a');
+        a.setAttribute("id", "proxy_send_profile_link");
         a.setAttribute("href", "javascript:void(0);");
         a.setAttribute("onclick", "javascript:profile$dump();");
         a.setAttribute("style", "position: absolute; top: 40px; left: 0; border: 0; color: #777777; z-index: 100;");
@@ -335,6 +462,33 @@ var profileOutputHandler = {
     },
 };
 
+var documentWriteArgHandler = {
+    name: "DOCWR",
+    nextID: 0,
+
+
+    accepts: function (request) {
+        var url = parseURL(request.url);
+        return request.method === 'POST' && str_endsWith(url.pathname, "/document_write_arg");
+    },
+
+    process: function (request, response) {
+        var chunks = [];
+        var self = this;
+
+        request.addListener('data', function(chunk) {
+            chunks.push(chunk);
+        });
+
+        request.addListener('end', function() {
+            fs.writeFileSync(options.outputDir + "/docwrite" + self.nextID, merge(chunks));
+            self.nextID += 1;
+            response.writeHead(200, { 'Content-Type': 'text/plain' });
+            response.end("done\n");
+        });
+    },
+};
+
 var scriptSourceHandler = {
     name: "SCRIPT",
 
@@ -345,7 +499,6 @@ var scriptSourceHandler = {
 
     process: function (request, response) {
         var chunks = [];
-        var handler = this;
 
         request.addListener('data', function(chunk) {
             chunks.push(chunk);
@@ -357,6 +510,72 @@ var scriptSourceHandler = {
             recordSource(merge(chunks), filename);
             response.writeHead(200, { 'Content-Type': 'text/plain' });
             response.end("done\n");
+        });
+    },
+};
+
+var PACHandler = {
+    name: "PAC  ",
+
+    accepts: function (request) {
+        var url = parseURL(request.url);
+        return request.method === 'GET' && str_endsWith(url.pathname, "/proxy$config.pac");
+    },
+
+    process: function (request, response) {
+        var pac = fs.readFileSync('./data/proxy.pac').toString();
+        pac = pac.replace("${PROXY_HTTP_PORT}", String(options.httpPort));
+        pac = pac.replace("${PROXY_HTTPS_PORT}", String(options.httpsProxyPort));
+
+        response.writeHead(200, {
+                'Content-Type': 'application/javascript',
+                'content-length': String(pac.length) 
+        });
+
+        response.end(pac);
+    },
+}
+
+var innerHTMLHandler = {
+    name: "iHTML",
+    nextID: 0,
+
+    accepts: function (request) {
+        var url = parseURL(request.url);
+        return request.method === 'POST' && str_endsWith(url.pathname, "/proxy$innerHTML");
+    },
+
+    process: function (request, response) {
+        var chunks = [];
+        var self = this;
+
+        request.addListener('data', function(chunk) {
+            chunks.push(chunk);
+        });
+
+        request.addListener('end', function() {
+            var url = parseURL(request.url);
+            // var filename = url.query.replace('filename=', '');
+            var data = merge(chunks).toString("utf-8");
+            var id = self.nextID++;
+            //recordSource(data, "innerhtml" + id);
+            var instrumented_val = instrument_html(data, "innerhtml" + id);
+
+            var buffer;
+            if (typeof instrumented_val === "string") {
+                buffer = new Buffer(instrumented_val);
+            } else {
+                buffer = instrumented_val;
+            }
+            //recordInstrumentedSource(data, "innerhtml" + id);
+
+            response.writeHead(200, {
+                'Content-Type': 'text/html',
+                'content-length': String(buffer.length) 
+
+            });
+
+            response.end(instrumented_val);
         });
     },
 };
@@ -444,7 +663,7 @@ ProxyHandler.prototype.process = function (request, response, proxyObj) {
             // Disable caching
             var cache_control = [];
             if ("cache-control" in proxy_response.headers) {
-                var cache_control = proxy_response.headers["cache-control"].split(",");
+                cache_control = proxy_response.headers["cache-control"].split(",");
                 for (var i = cache_control.length-1; i >= 0; i--) {
                     var value = cache_control[i].trim();
                     if (value === "public" || value === "private") {
@@ -486,10 +705,12 @@ Proxy.prototype.process = function (request, response) {
         if (handler.accepts(request)) {
             info("[" + handler.name + "]: "  + request.method + " " + request.url);
             handler.process(request, response, this);
-            break;
+            return;
         }
     }
-}
+
+    info("[--?--]: " + request.method + " " + request.url);
+};
 
 function createHTTPProxy(handlers) {
     var proxy = new Proxy(http, handlers);
@@ -542,8 +763,15 @@ function parseCmdLine(argv) {
         var arg = argv[i];
         if (arg === "--record-js") {
             options.recordSource = true;
+            options.recordInstrumentedSource = true;
         } else if (arg === "-d" || arg === "--output-dir") {
             options.outputDir = argv[++i];
+        } else if (arg === "--pac-port") {
+            options.pacPort = parseFloat(argv[++i]);
+        } else if (arg === "--http-port") {
+            options.httpPort = parseFloat(argv[++i]);
+        } else if (arg === "--https-port") {
+            options.httpsProxyPort = parseFloat(argv[++i]);
         } else {
             throw "Unrecognized option: " + argv[i];
         }
@@ -555,7 +783,10 @@ parseCmdLine(process.argv);
 var proxy_handlers = [
     js2jsHandler,
     scriptSourceHandler,
-    profileOutputHandler, 
+    profileOutputHandler,
+    documentWriteArgHandler,
+    innerHTMLHandler,
+    // PACHandler,
     new ProxyHandler([
         htmlHandler,
         jsHandler
@@ -564,15 +795,18 @@ var proxy_handlers = [
 
 createHTTPProxy(proxy_handlers).listen(options.httpPort);
 createHTTPSProxy(proxy_handlers).listen(options.httpsPort);
-// https.createServer({
-//     key: options.key,
-//     cert: options.cert,
-//     agent: false,
-// },
-// function (req, res) {
-//     res.writeHead(200, {
-//         "content-type": "text/html",
-//     });
-//     res.end("<html></html>\r\n\r\n");
-// }).listen(options.httpsPort);
+
+http.createServer(function (req, res) {
+    var pac = fs.readFileSync('./data/proxy.pac').toString();
+    pac = pac.replace("${PROXY_HTTP_PORT}", String(options.httpPort));
+    pac = pac.replace("${PROXY_HTTPS_PORT}", String(options.httpsProxyPort));
+
+    res.writeHead(200, {
+        'Content-Type': 'application/javascript',
+        'content-length': String(pac.length) 
+    });
+
+    res.end(pac);
+}).listen(options.pacPort);
+
 connect_handler.listen(options.httpsProxyPort);

@@ -22,13 +22,16 @@ profile$String_output_port.prototype.write_char = function (c)
 
 profile$String_output_port.prototype.write_string = function (str)
 {
+    return;
     for (var i=0; i<str.length; i++)
         this.write_char(str.charCodeAt(i));
 };
 
 profile$String_output_port.prototype.print = function (str)
 {
-    this.write_string(str + "\n");
+    return;
+    this.write_string(str);
+    this.write_string("\n");
 };
 
 profile$String_output_port.prototype.get_output_string = function ()
@@ -489,14 +492,14 @@ function profile$return0(loc, profile, debug, fn)
 {
     if (profile)
         profile$return_tp(undefined);
-    profile$nest(loc, false, debug, fn)
+    profile$nest(loc, false, debug, fn);
 }
 
 function profile$return1(loc, profile, debug, fn, result)
 {
     if (profile)
         profile$return_tp(result);
-    profile$nest(loc, false, debug, fn)
+    profile$nest(loc, false, debug, fn);
     return result;
 }
 
@@ -611,6 +614,31 @@ function profile$send_script(source, filename)
     }
 }
 
+function profile$send_innerHTML(source, filename)
+{
+    if (profile$XMLHttpRequest !== undefined)
+    {
+        var http = new profile$XMLHttpRequest();
+        var url = "proxy$innerHTML";
+        if (filename !== undefined) {
+            url = url + "?filename=" + filename;
+        }
+        http.open("POST", url, false); // Synchronous AJAX request
+        http.setRequestHeader("Content-type", "text/html");
+        http.setRequestHeader("Content-length", source.length);
+        http.setRequestHeader("Connection", "close");
+        http.send(source);
+        return http.responseText;
+    }
+    else
+    {
+        profile$print("=========================== INNER HTML "+filename);
+        profile$print(source);
+        profile$print("===========================");
+        return source;
+    }
+}
+
 var profile$window = this.window;
 var profile$document = this.document;
 
@@ -624,6 +652,8 @@ function object_familiar_name(obj)
         return "some_array";
     if (typeof obj === "function")
         return "some_" + typeof obj;
+    if (typeof obj === "undefined")
+        return "undefined";
     return obj.toString();
 }
 
@@ -675,6 +705,39 @@ function profile$Function()
 }
 
 Function = profile$Function;
+
+var profile$document_write_orig = document.write;
+var profile$document_write_called = false;
+
+function profile$document_write(s)
+{
+    if (profile$document_write_called === false) {
+        profile$document_write_called = true;
+        document.getElementById("proxy_send_profile_link").innerHTML += " (*)";
+    }
+
+
+    for (var i = 0; i < arguments.length; i++) {
+        profile$send_document_write(arguments[i]);
+    }
+
+    profile$document_write_orig.apply(this, arguments);
+}
+
+function profile$send_document_write(text)
+{
+    if (profile$XMLHttpRequest !== undefined)
+    {
+        var http = new profile$XMLHttpRequest();
+        http.open("POST", "document_write_arg", true);
+        http.setRequestHeader("Content-type", "text/html");
+        http.setRequestHeader("Content-length", text.length);
+        http.setRequestHeader("Connection", "close");
+        http.send(text);
+    }
+}
+
+document.write = profile$document_write;
 
 function profile$access_prop_tp(loc, obj)
 {
@@ -749,7 +812,17 @@ function profile$store_prop_aux(loc, obj, prop, val)
 function profile$get_prop(loc, obj, prop)
 {
     profile$fetch_prop(loc, obj, prop);
-    return obj[prop];
+
+    if (prop === "innerHTML" && "hasOwnProperty" in obj) {
+        if (obj.hasOwnProperty("proxy$innerHTML_orig")) {
+            // Return uninstrumented innerHTML
+            prop = "proxy$innerHTML_orig";
+        }
+    }
+    // if (obj === undefined) console.log("Trying to fetch prop " + prop + " from undefined");
+    var v = obj[prop];
+    // if (v === undefined) console.log("Failed to read " + prop + " from " + obj);
+    return v;
 }
 
 function profile$put_prop_preinc(loc, obj, prop)
@@ -782,6 +855,19 @@ function profile$put_prop_postdec(loc, obj, prop)
 
 function profile$put_prop(loc, obj, prop, val)
 {
+    if (prop === "innerHTML" && "hasOwnProperty" in obj) {
+        // Save original value to support append
+        if (!obj.hasOwnProperty("proxy$innerHTML_orig"))
+            Object.defineProperty(obj, "proxy$innerHTML_orig",
+                    { enumerable: false, value: val });
+        else
+            obj["proxy$innerHTML_orig"] = val;
+
+        if (obj.tagName.toLowerCase() === "script") {
+            alert("Assigning script text via innerHTML");
+        }
+        val = profile$send_innerHTML(val);
+    }
     var result = obj[prop] = val;
     profile$store_prop(loc, obj, prop, result);
     return result;
@@ -789,7 +875,26 @@ function profile$put_prop(loc, obj, prop, val)
 
 function profile$put_prop_add(loc, obj, prop, val)
 {
+    var is_innerHTML = (prop === "innerHTML") && ("hasOwnProperty" in obj);
+    if (is_innerHTML) {
+        var innerhtml_orig;
+        if (obj.tagName === "script") {
+            alert("Assigning script text via innerHTML");
+        }
+        if (obj.hasOwnProperty("proxy$innerHTML_orig")) {
+            innerhtml_orig = obj["proxy$innerHTML_orig"];
+        } else {
+            innerhtml_orig = obj.innerhtml; // TODO: side effects?
+            Object.defineProperty(obj, "proxy$innerHTML_orig",
+                    { enumerable: false, value: innerhtml_orig + val });
+        }
+        obj["proxy$innerHTML_orig"] = innerhtml_orig + val;
+        val = profile$send_innerHTML(val);
+    }
     var result = obj[prop] += val;
+    if (is_innerHTML) {
+        result = obj["proxy$innerHTML_orig"];
+    }
     profile$fetch_store_prop(loc, obj, prop, result);
     return result;
 }

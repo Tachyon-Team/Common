@@ -1,7 +1,30 @@
-#!/bin/sh
+#!/bin/bash
+
+proxy_options=() # array of options for the proxy
+node_options=()  # array of options for node.js
+eoo=0       # end of options reached?
+
+for arg in "$@"; do
+  if ! ((eoo)); then
+    case "$arg" in
+      --debug)
+        node_options+=("$arg")
+        ;;
+      --)
+        eoo=1
+        proxy_options+=("$arg")
+        ;;
+      *)
+        proxy_options+=("$arg")
+        ;;
+    esac
+  else
+    proxy_options+=("$arg")
+  fi
+done
 
 # Make sure we run node.js from the appropriate directory
 cd "${0%/*}" 2>/dev/null
 
 # Start the proxy
-node ./lib/proxy.js "$@"
+node "${node_options[@]}" ./lib/proxy.js "${proxy_options[@]}"
