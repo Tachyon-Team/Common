@@ -58,6 +58,8 @@ var command_line_arguments = [];
 
 if (typeof arguments !== "undefined") /* make it work in the browser */
     command_line_arguments = arguments;
+else if (typeof process !== "undefined") /* support node.js as an alternative */
+    command_line_arguments = process.argv.slice(2)
 
 /**
 Get the command-line arguments
