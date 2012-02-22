@@ -71,12 +71,13 @@ while [ "$1" != "" ]; do
        "-warn") OPT_WARN="-warn" ;;
         "-ast") OPT_AST="-ast" ;;
          "-js") OPT_JS="-js" ;;
+         "-raw") OPT_JS="-raw" ;;
           "--") shift
                 break ;;
           *.js) LAST_FILE="$1"
                 FILES="$FILES $LAST_FILE"
                 ;;
-             *) echo "Usage: $0 [-profile|-namespace <ns>|-export <id>|-debug|-warn|-ast|-js] file1.js file2.js ..."
+             *) echo "Usage: $0 [-profile|-namespace <ns>|-export <id>|-debug|-warn|-ast|-js|-raw] file1.js file2.js ..."
                 exit 1
                 ;;
   esac
