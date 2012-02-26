@@ -71,7 +71,7 @@ while [ "$1" != "" ]; do
        "-warn") OPT_WARN="-warn" ;;
         "-ast") OPT_AST="-ast" ;;
          "-js") OPT_JS="-js" ;;
-         "-raw") OPT_JS="-raw" ;;
+         "-raw") OPT_RAW="-raw" ;;
           "--") shift
                 break ;;
           *.js) LAST_FILE="$1"
@@ -85,11 +85,11 @@ while [ "$1" != "" ]; do
 done
 
 if [ "$OPT_AST" != "" ]; then
-  if ! $JS2JS $OPT_PROFILE $OPT_NAMESPACE $OPT_EXPORTS $OPT_DEBUG $OPT_WARN -ast -nojs $FILES; then
+  if ! $JS2JS $OPT_PROFILE $OPT_NAMESPACE $OPT_EXPORTS $OPT_DEBUG $OPT_WARN $OPT_RAW -ast -nojs $FILES; then
     exit 1
   fi
 else
-  if ! $JS2JS $OPT_PROFILE $OPT_NAMESPACE $OPT_EXPORTS $OPT_DEBUG $OPT_WARN $FILES < /dev/null > $LAST_FILE.js; then
+  if ! $JS2JS $OPT_PROFILE $OPT_NAMESPACE $OPT_EXPORTS $OPT_DEBUG $OPT_WARN $OPT_RAW $FILES < /dev/null > $LAST_FILE.js; then
     cat "$LAST_FILE.js"
     rm -f "$LAST_FILE.js"
     exit 1
