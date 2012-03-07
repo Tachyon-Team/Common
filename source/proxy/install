@@ -16,8 +16,8 @@ if [ ! -d "./node_modules/jsdom" ]; then
     echo "  * Installing jsdom"
     npm install jsdom || { echo "Installation failed" >&2; exit 1; }
 
-    #echo "    Patching jsdom"
-    #patch -p1 < patch/jsdom.patch || { echo "Patch failed" >&2; exit 1; }
+    echo "    Patching jsdom"
+    patch -p1 < patch/jsdom.patch || { echo "Patch failed" >&2; exit 1; }
     echo "    Patching htmlparser"
     patch -p1 < patch/htmlparser.patch || { echo "Patch failed" >&2; exit 1; }
 fi
@@ -28,4 +28,5 @@ if [ ! -d "./node_modules/buffertools" ]; then
 fi
 
 echo "Installation completed."
+echo "IMPORTANT: you need to run 'make' from the parser directory in order to generate 'js2js-lib.js'"
 echo "You can start the proxy using the 'run-proxy' script."
