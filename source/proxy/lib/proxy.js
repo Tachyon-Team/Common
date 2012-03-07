@@ -264,9 +264,25 @@ function instrument_html(data, filename) {
 }
 
 function instrument_js(data, filename) {
-    var prefix = null;
+    var prefix = "";
+    var suffix = "";
+    data = trim(data);
+
+    if (str_startsWith(data, "<![CDATA[") && str_endsWith(data, "]]>")) {
+        prefix += data.substring(0, 9);
+        suffix += data.substring(data.length - 3);
+        data = data.substring(9, data.length - 3);
+    } else if (str_startsWith(data, "<!--") && str_endsWith(data, "-->")) {
+        prefix += data.substring(0, 4);
+        suffix += data.substring(data.length - 3);
+        data = data.substring(4, data.length - 3);
+    }
+    if (!str_endsWith(data, "\n")) {
+        data += "\n";
+    }
+    
     if (str_startsWith(data, UNPARSEABLE_CRUFT)) {
-        prefix = UNPARSEABLE_CRUFT;
+        prefix += UNPARSEABLE_CRUFT;
         data = data.slice(UNPARSEABLE_CRUFT.length);
     }
     recordSource(data, filename);
@@ -275,14 +291,13 @@ function instrument_js(data, filename) {
         var script = js2js.instrument(data, options.js2jsOptions);
     } catch (e) {
         console.log("Failed to instrument code:");
-        console.log(data);
+        console.log("'" + data + "'");
         console.log("--------------------");
         throw e;
     }
     recordInstrumentedSource(script, filename);
-    if (prefix !== null) {
-        script = prefix + script;
-    }
+    script = prefix + script + suffix + "\n\n";
+
     return script;
 }
 
