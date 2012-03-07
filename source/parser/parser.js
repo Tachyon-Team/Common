@@ -364,7 +364,7 @@ Parser.prototype.parse = function ()
                     a = t[i];
                 }
 
-                if (autosemicolon_index !== 0)
+                if (normal_index === 0 && autosemicolon_index !== 0)
                 {
                     autosemicolon_inserted = true;
                     a = t[autosemicolon_index];
