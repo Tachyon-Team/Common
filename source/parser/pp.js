@@ -618,14 +618,19 @@ function ast_to_js(ast, ctx)
     }
     else if (ast instanceof WithStatement)
     {
-        // TODO
-        pp(ast);
-        error("WithStatement not implemented");
-        /*
-        pp_loc(ast.loc, pp_prefix(indent) + "WithStatement");
-        pp_asts(indent, "expr", [ast.expr]);
-        pp_asts(indent, "statement", [ast.statement]);
-        */
+        js_indent(ctx);
+        js_out("with (", ctx);
+        ast_to_js(ast.expr, ctx);
+        js_out(") {\n", ctx);
+
+        js_indent_begin(ctx);
+        if (ast.statement !== null) {
+            ast_to_js(ast.statement, ctx);
+        }
+        js_indent_end(ctx);
+
+        js_indent(ctx);
+        js_out("}\n", ctx);
     }
     else if (ast instanceof SwitchStatement)
     {
