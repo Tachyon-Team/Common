@@ -1127,5 +1127,10 @@ function ast_normalize(ast, options)
 // Node.js support
 if (typeof exports !== "undefined")
 {
+    exports.ast_walk_statement = ast_walk_statement;
+    exports.ast_walk_statements = ast_walk_statements;
+    exports.ast_walk_expr = ast_walk_expr;
+    exports.ast_walk_exprs = ast_walk_exprs;
+
     exports.ast_normalize = ast_normalize;
 }
