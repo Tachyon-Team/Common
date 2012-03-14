@@ -251,7 +251,7 @@ function instrument_html(data, filename) {
     a.setAttribute("id", "proxy_send_profile_link");
     a.setAttribute("href", "javascript:void(0);");
     a.setAttribute("onclick", "javascript:profile$dump();");
-    a.setAttribute("style", "position: absolute; top: 40px; left: 0; border: 0; color: #777777; z-index: 100;");
+    a.setAttribute("style", "position: absolute; top: 40px; left: 0; border: 0; color: #777777; z-index: 9999;");
     a.innerHTML = 'Send profile';
     document.body.insertBefore(a, document.body.children[0]);
 
@@ -293,6 +293,9 @@ function instrument_js(data, filename) {
         console.log("Failed to instrument code:");
         console.log("'" + data + "'");
         console.log("--------------------");
+        if (options.recordSource) {
+            console.log("Data dumped to " + options.outputDir + "/" + filename);
+        }
         throw e;
     }
     recordInstrumentedSource(script, filename);
@@ -399,7 +402,7 @@ var htmlHandler = {
         a.setAttribute("id", "proxy_send_profile_link");
         a.setAttribute("href", "javascript:void(0);");
         a.setAttribute("onclick", "javascript:profile$dump();");
-        a.setAttribute("style", "position: absolute; top: 40px; left: 0; border: 0; color: #777777; z-index: 100;");
+        a.setAttribute("style", "position: absolute; top: 40px; left: 0; border: 0; color: #777777; z-index: 9999;");
         a.innerHTML = 'Send profile';
         document.body.insertBefore(a, document.body.children[0]);
 
