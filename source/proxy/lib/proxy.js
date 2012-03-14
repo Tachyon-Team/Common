@@ -28,6 +28,9 @@ var options = {
     cert: fs.readFileSync('./data/cert.pem'),
 
     outputDir: "output",
+
+    // Dynamic options
+    enableLogging: false
 };
 
 jsdom.defaultDocumentFeatures = {
@@ -241,6 +244,13 @@ function instrument_html(data, filename) {
     profiler_script.setAttribute("type", "application/javascript");
     profiler_script.setAttribute("src", "/js2js/profiler-lib.js");
     container.insertBefore(profiler_script, container.children[0]);
+
+    if (options.enableLogging) {
+        var log_enabler_script = document.createElement('script');
+        log_enabler_script.setAttribute("type", "application/javascript");
+        log_enabler_script.innerHTML = "profile$enableLogging();";
+        container.insertBefore(log_enabler_script, container.children[1]);
+    }
 
     var js2js_script = document.createElement('script');
     js2js_script.setAttribute("type", "application/javascript");
@@ -798,6 +808,8 @@ function parseCmdLine(argv) {
             options.httpPort = parseFloat(argv[++i]);
         } else if (arg === "--https-port") {
             options.httpsProxyPort = parseFloat(argv[++i]);
+        } else if (arg === "--enable-log") {
+            options.enableLogging = true;
         } else {
             throw "Unrecognized option: " + argv[i];
         }

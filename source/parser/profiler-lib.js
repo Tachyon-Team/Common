@@ -43,7 +43,13 @@ function profile$print(str)
     profile$output.print(str);
 }
 
+function profile$enableLogging()
+{
+    profile$loggingEnabled = true;
+}
+
 var profile$output = new profile$String_output_port();
+var profile$loggingEnabled = false;
 
 var profile$temp = undefined;
 var profile$call_loc = "unknown";
@@ -458,8 +464,10 @@ function profile$report()
       profile$print("");
     }
 
-    profile$print("--------------------------- LOG");
-    profile$print(log);
+    if (log) {
+        profile$print("--------------------------- LOG");
+        profile$print(log);
+    }
 
     return profile$output.get_output_string();
 }
@@ -1086,7 +1094,8 @@ function profile$call_prop(loc, obj, prop)
 
 function profile$log(text)
 {
-    profile$print(text);
+    if (profile$loggingEnabled)
+        profile$print(text);
 }
 
 function profile$send_output(text)
