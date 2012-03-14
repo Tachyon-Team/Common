@@ -22,14 +22,12 @@ profile$String_output_port.prototype.write_char = function (c)
 
 profile$String_output_port.prototype.write_string = function (str)
 {
-    return;
     for (var i=0; i<str.length; i++)
         this.write_char(str.charCodeAt(i));
 };
 
 profile$String_output_port.prototype.print = function (str)
 {
-    return;
     this.write_string(str);
     this.write_string("\n");
 };
@@ -367,37 +365,40 @@ function profile$abstype_add(abstype, val)
 function profile$abstype_to_string(abstype)
 {
     var str = "";
-    if (abstype.num !== undefined)
-    { if (str !== "") str += " U ";
-      str += profile$absnum_to_string(abstype.num);
-    }
-    if (abstype.str !== undefined)
-    { if (str !== "") str += " U ";
-      str += "string[" + profile$absnum_to_string(abstype.str) + "]";
-    }
-    if (abstype.bool !== undefined)
-    { if (str !== "") str += " U ";
-      str += profile$absbool_to_string(abstype.bool);
-    }
-    if (abstype.undef !== undefined)
-    { if (str !== "") str += " U ";
-      str += "undefined";
-    }
-    if (abstype.nul !== undefined)
-    { if (str !== "") str += " U ";
-      str += "null";
-    }
-    if (abstype.fn !== undefined)
-    { if (str !== "") str += " U ";
-      str += "function";
-    }
-    if (abstype.obj !== undefined)
-    { if (str !== "") str += " U ";
-      str += profile$absobj_to_string(abstype.obj);
-    }
-    if (abstype.other.length > 0)
-    { if (str !== "") str += " U ";
-      str += abstype.other.join(" U ");
+    if (abstype !== undefined)
+    {
+      if (abstype.num !== undefined)
+      { if (str !== "") str += " U ";
+        str += profile$absnum_to_string(abstype.num);
+      }
+      if (abstype.str !== undefined)
+      { if (str !== "") str += " U ";
+        str += "string[" + profile$absnum_to_string(abstype.str) + "]";
+      }
+      if (abstype.bool !== undefined)
+      { if (str !== "") str += " U ";
+        str += profile$absbool_to_string(abstype.bool);
+      }
+      if (abstype.undef !== undefined)
+      { if (str !== "") str += " U ";
+        str += "undefined";
+      }
+      if (abstype.nul !== undefined)
+      { if (str !== "") str += " U ";
+        str += "null";
+      }
+      if (abstype.fn !== undefined)
+      { if (str !== "") str += " U ";
+        str += "function";
+      }
+      if (abstype.obj !== undefined)
+      { if (str !== "") str += " U ";
+        str += profile$absobj_to_string(abstype.obj);
+      }
+      if (abstype.other.length > 0)
+      { if (str !== "") str += " U ";
+        str += abstype.other.join(" U ");
+      }
     }
     return str;
 }
@@ -1071,6 +1072,10 @@ function profile$call_prop(loc, obj, prop)
 //        }
 //    }
     var f = obj[prop];
+    if (f === undefined) {
+        console.log("Trying to call undefined function " + prop + " of " + object_familiar_name(obj) + " at " + loc);
+        return;
+    }
     var args = [];
     for (var i=3; i<arguments.length; i++)
         args.push(arguments[i]);
