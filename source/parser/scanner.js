@@ -1275,4 +1275,7 @@ var keyword_hashtable =
 if (typeof exports !== "undefined")
 {
     exports.Scanner = Scanner;
+    exports.position_to_line = position_to_line;
+    exports.position_to_column = position_to_column;
+    exports.line_and_column_to_position = line_and_column_to_position;
 }
