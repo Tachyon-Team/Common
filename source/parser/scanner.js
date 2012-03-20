@@ -962,6 +962,7 @@ var LT_CH          =  60;
 var EQUAL_CH       =  61;
 var GT_CH          =  62;
 var QUESTION_CH    =  63;
+var AT_CH          =  64;
 var UPPER_A_CH     =  65;
 var UPPER_B_CH     =  66;
 var UPPER_D_CH     =  68;

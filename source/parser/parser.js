@@ -114,7 +114,7 @@ Parser.prototype.error = function (loc, msg)
 
 Parser.prototype.warning = function (loc, msg)
 {
-    log.warn(loc.to_string() + ": warning -- " + msg);
+    print(loc.to_string() + ": warning -- " + msg);
 };
 
 
