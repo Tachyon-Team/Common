@@ -10,6 +10,7 @@ var buffers  = require('buffertools');
 var URL      = require('url');
 var querystr = require('querystring');
 var js2js    = require('js2js');
+var opts     = require('opts');
 
 var DEBUG = false;
 
@@ -927,30 +928,73 @@ var connect_handler = net.createServer(function (client) {
 });
 
 function parseCmdLine(argv) {
-    if (argv.length <= 2) return;
+    var optionDefs = [
+        {
+            long        : 'record-js',
+            description : 'Record instrumented JavaScript source',
+            callback    : function () {
+                options.recordSource = true;
+                options.recordInstrumentedSource = true;
+            }
+        },
 
-    for (var i = 2; i < argv.length; i++) {
-        var arg = argv[i];
-        if (arg === "--record-js") {
-            options.recordSource = true;
-            options.recordInstrumentedSource = true;
-        } else if (arg === "--record-html") {
-            options.recordHTML = true;
-            options.recordInstrumentedHTML = true;
-        } else if (arg === "-d" || arg === "--output-dir") {
-            options.outputDir = argv[++i];
-        } else if (arg === "--pac-port") {
-            options.pacPort = parseFloat(argv[++i]);
-        } else if (arg === "--http-port") {
-            options.httpPort = parseFloat(argv[++i]);
-        } else if (arg === "--https-port") {
-            options.httpsProxyPort = parseFloat(argv[++i]);
-        } else if (arg === "--enable-log") {
-            options.enableLogging = true;
-        } else {
-            throw "Unrecognized option: " + argv[i];
+        {
+            long        : 'record-html',
+            description : 'Record instrumented HTML files',
+            callback    : function () {
+                options.recordHTML = true;
+                options.recordInstrumentedHTML = true;
+            }
+        },
+
+        {
+            short       : 'd',
+            long        : 'output-dir',
+            description : 'Specify the output directory (default: "output")',
+            value       : true,
+            callback    : function (value) {
+                options.outputDir = value;
+            }
+        },
+
+        {
+            long        : 'pac-port',
+            description : 'Specify the port used for proxy autoconfiguration (PAC) (default: "' + options.pacPort + '")',
+            value       : true,
+            callback    : function (value) {
+                options.pacPort = parseFloat(value);
+            }
+        },
+
+        {
+            long        : 'http-port',
+            description : 'Specify the port used for HTTP communication (default: "' + options.httpPort + '")',
+            value       : true,
+            callback    : function (value) {
+                options.httpPort = parseFloat(value);
+            }
+        },
+
+        {
+            long        : 'https-port',
+            description : 'Specify the port used for HTTPS communication (default: "' + options.httpsProxyPort + '")',
+            value       : true,
+            callback    : function (value) {
+                options.httpsProxyPort = parseFloat(value);
+            }
+        },
+
+
+        {
+            long        : 'enable-log',
+            description : 'Enabling the activity log in the recorded profile (expensive)',
+            callback    : function () {
+                options.enableLogging = true;
+            }
         }
-    }
+    ];
+    
+    opts.parse(optionDefs, true);
 }
 
 parseCmdLine(process.argv);
