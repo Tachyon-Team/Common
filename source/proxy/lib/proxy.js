@@ -3,6 +3,7 @@ var http     = require('http');
 var https    = require('https');
 var path     = require('path');
 var jsdom    = require('jsdom');
+var HTML5    = require('HTML5');
 var fs       = require('fs');
 var Buffer   = require('buffer').Buffer;
 var buffers  = require('buffertools');
@@ -19,9 +20,13 @@ var options = {
     httpsProxyPort: 8443,
     recordSource: false,
     recordInstrumentedSource: false,
+    recordHTML: false,
+    recordInstrumentedHTML: false,
     js2jsOptions: {
         profile: true,
         debug: true,
+        stringQuote: "'",
+        quoteAll: true
     },
 
     key: fs.readFileSync('./data/key.pem'),
@@ -42,18 +47,27 @@ jsdom.defaultDocumentFeatures = {
 
 // ----- Helper functions -----
 
+function isJavaScript(contentType) {
+    return contentType === "application/javascript"
+            || contentType === "application/x-javascript" 
+            || contentType === "application/x-javascript"
+            || contentType === "text/javascript"
+            || contentType === "application/ecmascript"
+            || contentType === "text/ecmascript";
+}
+
 var xml_special_to_escaped = {
     '&': '&amp;',
     '"': '&quot;',
     '<': '&lt;',
-    '>': '&gt;'
+    '>': '&gt;',
 };
  
 var xml_escaped_to_special = {
     '&amp;': '&',
     '&quot;': '"',
     '&lt;': '<',
-    '&gt;': '>'
+    '&gt;': '>',
 };
  
 function encodeEntities(string) {
@@ -63,7 +77,7 @@ function encodeEntities(string) {
 };
  
 function decodeEntities(string) {
-    return string.replace(/(&quot;|&lt;|&gt;|&amp;)/g,
+    return string.replace(/(&lt;|&gt;|&quot;|&amp;)/g,
         function(str, item) {
             return xml_escaped_to_special[item];
     });
@@ -191,10 +205,173 @@ function traverseDOM(root, f) {
     }
 }
 
+function parseHTML(data) {
+    // Pure jsdom version
+    // jsdom.jsdom(data).createWindow();
+    
+    // html5 version
+    var window = jsdom.jsdom('', null, {parser: HTML5}).createWindow();
+    var parser = new HTML5.Parser({document: window.document});
+    try {
+        parser.parse(data);
+    } catch (e) {
+        console.log("Failed to parse HTML data:");
+        //console.log("'" + data + "'");
+        console.log("--------------------");
+        // if (options.record) {
+        //     console.log("Data dumped to " + options.outputDir + "/" + filename);
+        // }
+        throw e;
+    }
+    window.document.is_fragment = parser.is_fragment;
+    return window;
+}
+
+function stable_sort(o, comparefn)
+{
+    var len = o.length;
+
+    /* Iterative mergesort algorithm */
+
+    if (len >= 2)
+    {
+        /* Sort pairs in-place */
+
+        for (var start=((len-2)>>1)<<1; start>=0; start-=2)
+        {
+            if (comparefn(o[start], o[start+1]) > 0)
+            {
+                var tmp = o[start];
+                o[start] = o[start+1];
+                o[start+1] = tmp;
+            }
+        }
+
+        if (len > 2)
+        {
+            /*
+             * For each k>=1, merge each pair of groups of size 2^k to
+             * form a group of size 2^(k+1) in a second array.
+             */
+
+            var a1 = o;
+            var a2 = new Array(len);
+
+            var k = 1;
+            var size = 2;
+
+            do
+            {
+                var start = ((len-1)>>(k+1))<<(k+1);
+                var j_end = len;
+                var i_end = start+size;
+
+                if (i_end > len)
+                    i_end = len;
+
+                while (start >= 0)
+                {
+                    var i = start;
+                    var j = i_end;
+                    var x = start;
+
+                    for (;;)
+                    {
+                        if (i < i_end)
+                        {
+                            if (j < j_end)
+                            {
+                                if (comparefn(a1[i], a1[j]) > 0)
+                                    a2[x++] = a1[j++];
+                                else
+                                    a2[x++] = a1[i++];
+                            }
+                            else
+                            {
+                                while (i < i_end)
+                                    a2[x++] = a1[i++];
+                                break;
+                            }
+                        }
+                        else
+                        {
+                            while (j < j_end)
+                                a2[x++] = a1[j++];
+                            break;
+                        }
+                    }
+
+                    j_end = start;
+                    start -= 2*size;
+                    i_end = start+size;
+                }
+
+                var t = a1;
+                a1 = a2;
+                a2 = t;
+
+                k++;
+                size *= 2;
+            } while (len > size);
+
+            if ((k & 1) === 0)
+            {
+                /* Last merge was into second array, so copy it back to o. */
+
+                for (var i=len-1; i>=0; i--)
+                    o[i] = a1[i];
+            }
+        }
+    }
+
+    return o;
+}
+
+function applyChanges(changes, data) {
+    changes = stable_sort(changes, function (c1, c2) {
+        return c1.loc.start - c2.loc.start;
+    });
+    var parts = [];
+
+    var pos = 0;
+    for (var i = 0; i < changes.length; i++) {
+        var c = changes[i];
+        if (c.loc.start > pos) {
+            parts.push(data.substring(pos, c.loc.start));
+            pos = c.loc.start;
+        }
+        switch (c.kind) {
+            case "replace":
+                parts.push(c.value);
+                pos = c.loc.end;
+                break;
+            case "insert":
+                parts.push(c.value);
+                break;
+            default:
+                throw "Unknown change kind: " + c.kind;
+        }
+    }
+
+    if (pos < data.length) {
+        parts.push(data.substring(pos));
+    }
+
+    return parts.join("");
+}
+
 function instrument_html(data, filename) {
     if (!data) return data;
 
-    var window = jsdom.jsdom(data).createWindow();
+    recordHTML(data, filename);
+
+    var changes = [];
+
+    //var window = jsdom.jsdom(null, null, {parser: HTML5}).createWindow()
+    //var parser = new HTML5.Parser({document: window.document});
+    //parser.parse(data);
+
+    var window = parseHTML(data);
     var document = window.document;
 
     // Instrument existing scripts
@@ -202,9 +379,17 @@ function instrument_html(data, filename) {
     for (var i = 0; i < scripts.length; i++) {
         var e = scripts[i];
         if (!e.hasAttribute('src')) {
-            var src = decodeEntities(e.innerHTML + "\n");
+            if (e.hasAttribute('type') && !isJavaScript(e.getAttribute('type'))) continue;
+            var src = decodeEntities(e.textContent + "\n");
             var script = instrument_js(src, filename + "$" + i + ".js");
-            e.innerHTML = encodeEntities(script);
+            changes.push({
+                kind: "replace",
+                loc: {
+                    start: e.loc.open.end,
+                    end: e.loc.close.start
+                },
+                value: script,
+            });
         }
     }
 
@@ -215,60 +400,74 @@ function instrument_html(data, filename) {
             return; // Skip text nodes etc.
         }
         for (var i = 0; i < htmlEvents.length; i++) {
-        var e = htmlEvents[i];
+            var e = htmlEvents[i];
             if (node.hasAttribute(e)) {
-                var code = node.getAttribute(e);
+                var code = decodeEntities(node.getAttribute(e));
                 var prefix = "";
                 if (str_startsWith(code, "javascript:")) {
                     code = code.slice(11);
                     prefix = "javascript:";
                 }
                 code = prefix + instrument_js(code + "\n", filename + "$" + e + eventCount++ + ".js");
-                node.setAttribute(e, code.replace(/[\n\r]+/g, ""));
+                changes.push({
+                    kind: "replace",
+                    loc: node.attrloc[e].value,
+                    value: '"' + encodeEntities(code.replace(/[\n\r]+/g, " ")).replace(/\\/g, "&#0092;") + '"'
+                });
             }
         }
     });
 
     
     var container;
-    if (document.head) {
+    if (document.head.loc) {
+        // Full page with head
         container = document.head;
-    } else if (document.body) {
+    } else if (document.body.loc) {
+        // Full page with body but no head
         container = document.body;
     } else {
-        // Guard against empty documents and fragments
-        return document.innerHTML;
+        // HTML fragment (no head, no body)
+        container = null;
     }
 
-    var profiler_script = document.createElement('script');
-    profiler_script.setAttribute("type", "application/javascript");
-    profiler_script.setAttribute("src", "/js2js/profiler-lib.js");
-    container.insertBefore(profiler_script, container.children[0]);
+    if (container) {
+        var profiler_lib_script = '<script type="application/javascript" src="/js2js/profiler-lib.js"></script>';
+        changes.push({
+            kind: "insert",
+            loc: {start: container.loc.open.end, end: container.loc.open.end},
+            value: profiler_lib_script
+        });
 
-    if (options.enableLogging) {
-        var log_enabler_script = document.createElement('script');
-        log_enabler_script.setAttribute("type", "application/javascript");
-        log_enabler_script.innerHTML = "profile$enableLogging();";
-        container.insertBefore(log_enabler_script, container.children[1]);
+        if (options.enableLogging) {
+            var logging_enabler_script = '<script type="application/javascript">profile$enableLogging();</script>';
+            changes.push({
+                kind: "insert",
+                loc: {start: container.loc.open.end, end: container.loc.open.end},
+                value: logging_enabler_script
+            });
+        }
+
+        var js2js_script = '<script type="application/javascript" src="/js2js/js2js-lib.js"></script>';
+
+        changes.push({
+            kind: "insert",
+            loc: {start: container.loc.open.end, end: container.loc.open.end},
+            value: js2js_script
+        });
+
+        var send_profile_link = '<a id="proxy_send_profile_link" href="javascript:void(0);"' +
+                                    ' onclick="javascript:profile$dump();"' +
+                                    ' style="position: absolute; top: 40px; left: 0; border: 0; color: #777777; z-index: 9999;">Send profile</a>';
+        changes.push({
+            kind: "insert",
+            loc: {start: document.body.loc.open.end, end: document.body.loc.open.end},
+            value: send_profile_link
+        });
     }
 
-    var js2js_script = document.createElement('script');
-    js2js_script.setAttribute("type", "application/javascript");
-    js2js_script.setAttribute("src", "/js2js/js2js-lib.js");
-    container.insertBefore(js2js_script, container.children[0]);
-
-    var a = document.createElement('a');
-    a.setAttribute("id", "proxy_send_profile_link");
-    a.setAttribute("href", "javascript:void(0);");
-    a.setAttribute("onclick", "javascript:profile$dump();");
-    a.setAttribute("style", "position: absolute; top: 40px; left: 0; border: 0; color: #777777; z-index: 9999;");
-    a.innerHTML = 'Send profile';
-    document.body.insertBefore(a, document.body.children[0]);
-
-    var html = document.innerHTML;
-    if (window.document.doctype) {
-        html = window.document.doctype + html;
-    }
+    var html = applyChanges(changes, data);
+    recordInstrumentedHTML(html, filename + ".instrumented");
 
     return html;
 }
@@ -314,29 +513,41 @@ function instrument_js(data, filename) {
     return script;
 }
 
+exports.instrument_html = instrument_html;
+exports.instrument_js = instrument_js;
+
+function recordOutput(data, filename) {
+    var d = options.outputDir;
+    try {
+        var stat = fs.statSync(d);
+        if (!stat.isDirectory()) throw "Output directory exists, but is not a directory";
+    } catch (e) {
+        fs.mkdirSync(d, 0755);
+    }
+    fs.writeFileSync(d + "/" + filename, data);
+}
+
 function recordSource(scriptSource, filename) {
     if (options.recordSource) {
-        var d = options.outputDir;
-        try {
-            var stat = fs.statSync(d);
-            if (!stat.isDirectory()) throw "Output directory exists, but is not a directory";
-        } catch (e) {
-            fs.mkdirSync(d, 0755);
-        }
-        fs.writeFileSync(d + "/" + filename, scriptSource);
+       recordOutput(scriptSource, filename);
     }
 }
 
 function recordInstrumentedSource(scriptSource, filename) {
     if (options.recordInstrumentedSource) {
-        var d = options.outputDir;
-        try {
-            var stat = fs.statSync(d);
-            if (!stat.isDirectory()) throw "Output directory exists, but is not a directory";
-        } catch (e) {
-            fs.mkdirSync(d, 0755);
-        }
-        fs.writeFileSync(d + "/" + filename + ".instrumented", scriptSource);
+       recordOutput(scriptSource, filename);
+    }
+}
+
+function recordHTML(html, filename) {
+    if (options.recordHTML) {
+        recordOutput(html, filename);
+    }
+}
+
+function recordInstrumentedHTML(html, filename) {
+    if (options.recordInstrumentedHTML) {
+        recordOutput(html, filename);
     }
 }
 
@@ -350,90 +561,13 @@ var htmlHandler = {
 
     process: function (request, response, data) {
         return instrument_html(data, "page" + this.pageCount++);
-        if (!data) return data;
-
-        var window = jsdom.jsdom(data).createWindow();
-        var document = window.document;
-
-        // Instrument existing scripts
-        var scripts = document.getElementsByTagName('script');
-        var filename = "page" + this.pageCount++;
-        for (var i = 0; i < scripts.length; i++) {
-            var e = scripts[i];
-            if (!e.hasAttribute('src')) {
-                var src = decodeEntities(e.innerHTML + "\n");
-                var script = instrument_js(src, filename + "$" + i + ".js");
-                e.innerHTML = encodeEntities(script);
-            }
-        }
-
-        var self = this;
-
-
-        var eventCount = 0;
-        // Instrument JS found in tag attributes
-        this.traverseDOM(window.document, function (node) {
-            if (! ("hasAttribute" in node)) {
-                return; // Skip text nodes etc.
-            }
-            for (var i = 0; i < self.htmlEvents.length; i++) {
-                var e = self.htmlEvents[i];
-                if (node.hasAttribute(e)) {
-                    var code = node.getAttribute(e);
-                    var prefix = "";
-                    if (str_startsWith(code, "javascript:")) {
-                        code = code.slice(11);
-                        prefix = "javascript:";
-                    }
-                    code = prefix + instrument_js(code + "\n", filename + "$" + e + eventCount++ + ".js");
-                    node.setAttribute(e, code.replace(/[\n\r]+/g, ""));
-                }
-            }
-        });
-
-        var container;
-        if (document.head) {
-            container = document.head;
-        } else {
-            container = document.body;
-        }
-        if (!container) return data; // Guard against empty documents
-        var profiler_script = document.createElement('script');
-        profiler_script.setAttribute("type", "application/javascript");
-        profiler_script.setAttribute("src", "/js2js/profiler-lib.js");
-        container.insertBefore(profiler_script, container.children[0]);
-
-        var js2js_script = document.createElement('script');
-        js2js_script.setAttribute("type", "application/javascript");
-        js2js_script.setAttribute("src", "/js2js/js2js-lib.js");
-        container.insertBefore(js2js_script, container.children[0]);
-
-        var a = document.createElement('a');
-        a.setAttribute("id", "proxy_send_profile_link");
-        a.setAttribute("href", "javascript:void(0);");
-        a.setAttribute("onclick", "javascript:profile$dump();");
-        a.setAttribute("style", "position: absolute; top: 40px; left: 0; border: 0; color: #777777; z-index: 9999;");
-        a.innerHTML = 'Send profile';
-        document.body.insertBefore(a, document.body.children[0]);
-
-        var html = window.document.innerHTML;
-        if (window.document.doctype) {
-            html = window.document.doctype + html;
-        }
-
-        return html;
     },
 };
 
 var jsHandler = {
     accepts: function (request, response) {
         var content_type = getProperty(response.headers, "content-type", "");
-    
-        return str_startsWith(content_type, "application/javascript")
-            || str_startsWith(content_type, "application/x-javascript")
-            || str_startsWith(content_type, "text/javascript")
-            || str_startsWith(content_type, "application/ecmascript")
-            || str_startsWith(content_type, "text/ecmascript");
+        return isJavaScript(content_type);
     },
 
     process: function (request, response, data) {
@@ -483,7 +617,7 @@ var profileOutputHandler = {
         });
 
         request.addListener('end', function() {
-            fs.writeFileSync(options.outputDir + "/profile", merge(chunks));
+            recordOutput(merge(chunks), "profile");
             response.writeHead(200, { 'Content-Type': 'text/plain' });
             response.end("done\n");
         });
@@ -509,7 +643,7 @@ var documentWriteArgHandler = {
         });
 
         request.addListener('end', function() {
-            fs.writeFileSync(options.outputDir + "/docwrite" + self.nextID, merge(chunks));
+            recordOutput(merge(chunks), "docwrite" + self.nextID);
             self.nextID += 1;
             response.writeHead(200, { 'Content-Type': 'text/plain' });
             response.end("done\n");
@@ -683,7 +817,7 @@ ProxyHandler.prototype.process = function (request, response, proxyObj) {
         proxy_response.addListener('end', function() {
             var data = merge(chunks);
             var content_type = getProperty(proxy_response.headers, "content-type", "");
-            if (str_startsWith(content_type, "text/html") || str_startsWith(content_type, "text/javascript")) {
+            if (str_startsWith(content_type, "text/html") || isJavaScript(content_type)) {
                  data = data.toString("utf8");
             }
             data = handler.handleResponse(request, proxy_response, data);
@@ -800,6 +934,9 @@ function parseCmdLine(argv) {
         if (arg === "--record-js") {
             options.recordSource = true;
             options.recordInstrumentedSource = true;
+        } else if (arg === "--record-html") {
+            options.recordHTML = true;
+            options.recordInstrumentedHTML = true;
         } else if (arg === "-d" || arg === "--output-dir") {
             options.outputDir = argv[++i];
         } else if (arg === "--pac-port") {

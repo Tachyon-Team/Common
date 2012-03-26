@@ -6,6 +6,18 @@
 #    brew install node.js
 #    ./install
 
+for arg in $*; do
+    case "$arg" in
+        -f|--force)
+            rm -fr node_modules/{jsdom,html5,buffertools}
+            shift
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
 command -v node &>/dev/null || { echo "node not found. Please install node.js and add it to your path." >&2; exit 1; }
 command -v npm &>/dev/null || { echo "npm not found. Please install npm and add it to your path." >&2; exit 1; }
 
@@ -14,19 +26,23 @@ echo "Checking node.js dependencies"
 
 if [ ! -d "./node_modules/jsdom" ]; then
     echo "  * Installing jsdom"
-    npm install jsdom || { echo "Installation failed" >&2; exit 1; }
+    npm install 'jsdom@0.2.13' || { echo "Installation failed" >&2; exit 1; }
+fi
 
-    echo "    Patching jsdom"
-    patch -p1 < patch/jsdom.patch || { echo "Patch failed" >&2; exit 1; }
-    echo "    Patching htmlparser"
-    patch -p1 < patch/htmlparser.patch || { echo "Patch failed" >&2; exit 1; }
+if [ ! -d "./node_modules/html5" ]; then
+    echo "  * Installing html5"
+    npm install 'html5@v0.3.5' || { echo "Installation failed" >&2; exit 1; }
+
+    echo "    Patching html5"
+    patch -p1 < patch/html5-loc.patch || { echo "Patch failed" >&2; exit 1; }
 fi
 
 if [ ! -d "./node_modules/buffertools" ]; then
     echo "  * Installing buffertools"
-    npm install buffertools || { echo "Installation failed" >&2; exit 1; }
+    npm install 'buffertools@1.0.6' || { echo "Installation failed" >&2; exit 1; }
 fi
 
+echo "----------------------------------------"
 echo "Installation completed."
 echo "IMPORTANT: you need to run 'make' from the parser directory in order to generate 'js2js-lib.js'"
 echo "You can start the proxy using the 'run-proxy' script."

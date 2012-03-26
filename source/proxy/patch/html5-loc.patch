@@ -1,0 +1,504 @@
+diff -ru orig/node_modules/html5/lib/html5/buffer.js new/node_modules/html5/lib/html5/buffer.js
+--- orig/node_modules/html5/lib/html5/buffer.js	2011-11-15 23:33:03.000000000 -0500
++++ new/node_modules/html5/lib/html5/buffer.js	2012-03-23 15:18:45.000000000 -0400
+@@ -4,7 +4,21 @@
+ function Buffer() {
+ 	this.data = '';
+ 	this.start = 0;
+-    this.committed = 0;
++
++	this.input = '';
++        this.pos = 0;
++        this.update_pos = true;
++
++        var start = 0;
++	this.__defineSetter__('start', function(v) {
++                if (this.update_pos) {
++        	    this.pos += (v - start);
++                }
++		start = v;
++        });
++        this.__defineGetter__('start', function() { return start; });
++
++	this.committed = 0;
+ 	var eof;
+ 	this.__defineSetter__('eof', function(f) {
+ 		eof = f
+@@ -43,7 +57,9 @@
+ 			if(this.committed > this.data.length / 2) {
+ 				// Sliiiide
+ 				this.data = this.data.slice(this.committed);
++                                this.update_pos = false;
+ 				this.start = this.start - this.committed;
++                                this.update_pos = true;
+ 				this.committed = 0;
+ 			}
+ 		}
+@@ -73,6 +89,7 @@
+ 	},
+ 	append: function(data) {
+         HTML5.debug('buffer.append', data);
++        	this.input += data;
+ 		this.data += data
+ 	},
+ 	shift: function(n) {
+diff -ru orig/node_modules/html5/lib/html5/parser.js new/node_modules/html5/lib/html5/parser.js
+--- orig/node_modules/html5/lib/html5/parser.js	2011-11-15 23:33:03.000000000 -0500
++++ new/node_modules/html5/lib/html5/parser.js	2012-03-24 13:34:07.000000000 -0400
+@@ -82,23 +82,71 @@
+ 	this.phaseName = name;
+ }
+ 
++Parser.prototype.lookupTreeElementByName = function(name) {
++    name = name.toLowerCase();
++    if (this.tree.last_element && this.tree.last_element.nodeName.toLowerCase() === name) {
++        return this.tree.last_element;
++    }
++    for (var i = this.tree.open_elements.length - 1; i >= 0; i--) {
++        var candidate = this.tree.open_elements[i];
++        if (candidate.nodeName.toLowerCase() === name) {
++            return candidate;
++        }
++    }
++    return undefined;
++}
++
+ Parser.prototype.do_token = function(token) {
+ 	var method = 'process' + token.type;
++	this.loc = token.loc;
++	this.tree.last_element = undefined;
++    var element;
+ 
+ 	switch(token.type) {
+ 	case 'Characters':
+ 	case 'SpaceCharacters':
+ 	case 'Comment':
+ 		this.phase[method](token.data);
++		if (this.tree.last_element) this.tree.last_element.loc = token.loc;
+ 		break;
+ 	case 'StartTag':
+ 		if (token.name == "script") {
+ 			this.inScript = true;
+ 			this.scriptBuffer = '';
+ 		}
++        if (token.name === "html" && !this.first_start_tag) {
++            this.is_fragment = false;
++        }
+ 		this.phase[method](token.name, token.data, token.self_closing);
++        element = this.lookupTreeElementByName(token.name);
++        if (element) {
++            element.loc = {open: token.loc}; 
++        } else {
++            console.log("Failed to find " + token.name + " element");
++        }
++		// this.tree.open_elements.last().loc = {open: token.loc};
++        // console.log(this.tree.open_elements.last() + " starting at " + this.tree.open_elements.last().loc);
+ 		break;
+ 	case 'EndTag':
++		// Some tags are treated differently by the various parsing phases...
++        element = this.lookupTreeElementByName(token.name);
++        if (!element) {
++            // Self-closing elements are not kept open, so look for the last child of the currently
++            // open element with the proper name
++            var nodes = this.tree.open_elements.last().getElementsByTagName(token.name.toLowerCase());
++            if (nodes.length > 0) {
++                element = nodes[nodes.length - 1];
++                if (typeof element.loc === "undefined") {
++                    // Found a tag, but we have no source location for it...
++                    element = undefined;
++                }
++            }
++        }
++
++        if (!element) {
++            console.log("Expected '" + token.name + "' but no such open element found");
++        }
++		element.loc.close = token.loc;
+ 		this.phase[method](token.name);
+ 		if (token.name == "script") {
+ 			this.inScript = false;
+@@ -106,6 +154,7 @@
+ 		break;
+ 	case 'Doctype':
+ 		this.phase[method](token.name, token.publicId, token.systemId, token.correct);
++		if (this.tree.last_element) this.tree.last_element.loc = token.loc;
+ 		break;
+ 	case 'EOF':
+ 		this.phase[method]();
+@@ -116,6 +165,19 @@
+ }
+ 
+ Parser.prototype.setup = function(container, encoding) {
++    /*
++	this.tokenizer.addListener('token', function(t) { 
++		return function(token) { 
++			if (token.loc) {
++				var loc = token.loc;
++				var text = t.tokenizer.buffer.input;
++				console.log(token.type + "@" + loc + " -> '" + text.substring(loc.start, loc.end).replace(/\n/g, "\\n") + "'");
++			} else {
++				console.log(token.type + "@[?-?] -> ?");
++			}
++		};
++	}(this));
++    */
+ 	this.tokenizer.addListener('token', function(t) { 
+ 		return function(token) { t.do_token(token); };
+ 	}(this));
+@@ -129,6 +191,7 @@
+ 
+ 	this.tree.reset();
+ 	this.first_start_tag = false;
++    this.is_fragment = true;
+ 	this.errors = [];
+ 
+ 	// FIXME: instantiate tokenizer and plumb. Pass lowercasing options.
+diff -ru orig/node_modules/html5/lib/html5/tokenizer.js new/node_modules/html5/lib/html5/tokenizer.js
+--- orig/node_modules/html5/lib/html5/tokenizer.js	2011-11-15 23:33:03.000000000 -0500
++++ new/node_modules/html5/lib/html5/tokenizer.js	2012-03-21 16:49:25.000000000 -0400
+@@ -4,6 +4,17 @@
+ var Buffer = require('./buffer').Buffer;
+ var Models = HTML5.Models;
+ 
++function Location(start, end) {
++    this.start = start;
++    this.end = end;
++}
++
++HTML5.Location = Location;
++
++Location.prototype.toString = function () {
++    return "[" + (this.start !== undefined ? this.start : "?") + "-" + (this.end !== undefined ? this.end : "?") + "]";
++};
++
+ function keys(h) {
+ 	var r = [];
+ 	for(var k in h) {
+@@ -35,6 +46,8 @@
+ 	this.escapeFlag = false;
+ 	this.lastFourChars = '';
+ 	this.current_token = null;
++        this.tok_start = 0;
++        this.tok_end = undefined;
+ 
+ 	if(input instanceof events.EventEmitter) {
+ 		source = input;
+@@ -82,6 +95,12 @@
+ t.prototype.emitToken = function(tok) { 
+ 	tok = this.normalize_token(tok);
+ 	HTML5.debug('tokenizer.token', tok)
++        if (tok.loc === undefined) {
++            tok.loc = new Location(this.tok_start, this.tok_end !== undefined ? this.tok_end : this.buffer.pos);
++            this.tok_start = this.buffer.pos;
++            this.tok_end = undefined;
++        }
++
+ 	if (this.content_model == Models.SCRIPT_CDATA && (tok.type == 'Characters' || tok.type == 'SpaceCharacters')) {
+ 		this.script_buffer += tok.data;
+ 	} else {
+@@ -244,6 +263,7 @@
+ 		this.emitToken({type: 'Characters', data: c});
+ 		this.commit();
+ 	} else if(c == '<' && !this.escapeFlag && (this.content_model == Models.PCDATA || this.content_model == Models.RCDATA || this.content_model == Models.CDATA || this.content_model == Models.SCRIPT_CDATA)) {
++        	this.tok_start = buffer.pos - 1;
+ 		this.state = 'tag_open_state';
+ 	} else if(c == '>' && this.escapeFlag && (this.content_model == Models.CDATA || this.content_model == Models.RCDATA || this.content_model == Models.SCRIPT_CDATA) && this.lastFourChars.match(/-->$/)) {
+ 		this.escapeFlag = false;
+@@ -298,6 +318,7 @@
+ 		} else {
+ 			// XXX
+ 			this.parse_error("expected-tag-name");
++                        this.tok_end = buffer.pos - data.length; // account for following call to 'unget'
+ 			this.emitToken({type: 'Characters', data: "<"});
+ 			buffer.unget(data);
+ 			this.state = 'data_state';
+@@ -309,6 +330,7 @@
+ 		if (data == '/') {
+ 			this.state = 'close_tag_open_state';
+ 		} else {
++                        this.tok_end = buffer.pos - data.length; // account for following call to 'unget'
+ 			this.emitToken({type: 'Characters', data: "<"});
+ 			buffer.unget(data);
+ 			this.state = 'data_state';
+@@ -344,6 +366,7 @@
+ 	data = buffer.char()
+ 	if (data == HTML5.EOF) { 
+ 		this.parse_error("expected-closing-tag-but-got-eof");
++                this.tok_end = buffer.pos - data.length; // account for following call to 'unget'
+ 		this.emitToken({type: 'Characters', data: '</'});
+ 		buffer.unget(data);
+ 		this.state = 'data_state'
+@@ -354,6 +377,7 @@
+ 		this.parse_error("expected-closing-tag-but-got-right-bracket");
+ 		this.state = 'data_state';
+ 	} else {
++                this.tok_end = buffer.pos - data.length; // account for following call to 'unget'
+ 		this.parse_error("expected-closing-tag-but-got-char", {data: data}); // param 1 is datavars:
+ 		buffer.unget(data);
+ 		this.state = 'bogus_comment_state';
+@@ -384,6 +408,7 @@
+ }
+ 
+ t.prototype.before_attribute_name_state = function(buffer) {
++	var loc = new Location(this.buffer.pos);
+ 	var data = buffer.shift(1);
+ 	if(HTML5.SPACE_CHARACTERS_R.test(data)) {
+ 		buffer.matchWhile(HTML5.SPACE_CHARACTERS);
+@@ -391,7 +416,7 @@
+ 		this.parse_error("expected-attribute-name-but-got-eof");
+ 		this.emit_current_token();
+ 	} else if (HTML5.ASCII_LETTERS_R.test(data)) {
+-		this.current_token.data.push({nodeName: data, nodeValue: ""});
++		this.current_token.data.push({nodeName: data, nodeValue: "", nameLoc: loc, valueLoc: new Location()});
+ 		this.state = 'attribute_name_state';
+ 	} else if(data == '>') {
+ 		this.emit_current_token();
+@@ -399,10 +424,10 @@
+ 		this.state = 'self_closing_tag_state';
+ 	} else if(data == "'" || data == '"' || data == '=') {
+ 		this.parse_error("invalid-character-in-attribute-name");
+-		this.current_token.data.push({nodeName: data, nodeValue: ""});
++		this.current_token.data.push({nodeName: data, nodeValue: "", nameLoc: loc, valueLoc: new Location()});
+ 		this.state = 'attribute_name_state';
+ 	} else {
+-		this.current_token.data.push({nodeName: data, nodeValue: ""});
++		this.current_token.data.push({nodeName: data, nodeValue: "", nameLoc: loc, valueLoc: new Location()});
+ 		this.state = 'attribute_name_state';
+ 	}
+ 	return true;
+@@ -420,6 +445,7 @@
+ 		emitToken = true;
+ 	} else if(HTML5.ASCII_LETTERS_R.test(data)) {
+ 		this.current_token.data.last().nodeName += data + buffer.matchWhile(HTML5.ASCII_LETTERS);
++		this.current_token.data.last().nameLoc.end = buffer.pos;
+ 		leavingThisState = false;
+ 	} else if(data == '>') {
+ 		// XXX If we emit here the attributes are converted to a dict
+@@ -435,9 +461,11 @@
+ 	} else if(data == "'" || data == '"') {
+ 		this.parse_error("invalid-character-in-attribute-name");
+ 		this.current_token.data.last().nodeName += data;
++		this.current_token.data.last().nameLoc.end = buffer.pos;
+ 		leavingThisState = false;
+ 	} else {
+ 		this.current_token.data.last().nodeName += data;
++		this.current_token.data.last().nameLoc.end = buffer.pos;
+ 		leavingThisState = false;
+ 	}
+ 
+@@ -463,6 +491,7 @@
+ }
+ 
+ t.prototype.after_attribute_name_state = function(buffer) {
++	var loc = new Location(this.buffer.pos);
+ 	var data = buffer.shift(1);
+ 	if(HTML5.SPACE_CHARACTERS_R.test(data)) {
+ 		buffer.matchWhile(HTML5.SPACE_CHARACTERS);
+@@ -474,32 +503,37 @@
+ 		this.parse_error("expected-end-of-tag-but-got-eof");
+ 		this.emit_current_token();
+ 	} else if(HTML5.ASCII_LETTERS_R.test(data)) {
+-		this.current_token.data.push({nodeName: data, nodeValue: ""});
++		this.current_token.data.push({nodeName: data, nodeValue: "", nameLoc: loc, valueLoc: new Location()});
+ 		this.state = 'attribute_name_state';
+ 	} else if(data == '/') {
+ 		this.state = 'self_closing_tag_state';
+ 	} else {
+-		this.current_token.data.push({nodeName: data, nodeValue: ""});
++		this.current_token.data.push({nodeName: data, nodeValue: "", nameLoc: loc, valueLoc: new Location()});
+ 		this.state = 'attribute_name_state';
+ 	}
+ 	return true;
+ }
+ 
+ t.prototype.before_attribute_value_state = function(buffer) {
++	var loc = new Location(buffer.pos);
+ 	var data = buffer.shift(1);
+ 	if(HTML5.SPACE_CHARACTERS_R.test(data)) {
+ 		buffer.matchWhile(HTML5.SPACE_CHARACTERS);
+ 	} else if(data == '"') {
++        	this.current_token.data.last().valueLoc = loc;
+ 		this.state = 'attribute_value_double_quoted_state';
+ 	} else if(data == '&') {
++        	this.current_token.data.last().valueLoc = loc;
+ 		this.state = 'attribute_value_unquoted_state';
+ 		buffer.unget(data);
+ 	} else if(data == "'") {
++        	this.current_token.data.last().valueLoc = loc;
+ 		this.state = 'attribute_value_single_quoted_state';
+ 	} else if(data == '>') {
+ 		this.emit_current_token();
+ 	} else if(data == '=') {
+ 		this.parse_error("equals-in-unquoted-attribute-value");
++        	this.current_token.data.last().valueLoc.end = this.buffer.pos;
+ 		this.current_token.data.last().nodeValue += data;
+ 		this.state = 'attribute_value_unquoted_state';
+ 	} else if(data == HTML5.EOF) {
+@@ -507,6 +541,9 @@
+ 		this.emit_current_token();
+ 		this.state = 'attribute_value_unquoted_state';
+ 	} else {
++        	var loc = this.current_token.data.last().valueLoc;
++                if (loc.start === undefined) loc.start = this.buffer.pos - 1;
++        	loc.end = this.buffer.pos;
+ 		this.current_token.data.last().nodeValue += data
+ 		this.state = 'attribute_value_unquoted_state'
+ 	}
+@@ -518,10 +555,12 @@
+ 	var data = buffer.shift(1);
+ 	if(data == '"') {
+ 		this.state = 'after_attribute_value_state';
++        	this.current_token.data.last().valueLoc.end = this.buffer.pos;
+ 	} else if(data == '&') {
+ 		this.process_entity_in_attribute(buffer);
+ 	} else if(data == HTML5.EOF) {
+ 		this.parse_error("eof-in-attribute-value-double-quote");
++        	this.current_token.data.last().valueLoc.end = this.buffer.pos;
+ 		this.emit_current_token();
+ 	} else {
+ 		this.current_token.data.last().nodeValue += data + buffer.matchUntil('["&]');
+@@ -532,6 +571,7 @@
+ t.prototype.attribute_value_single_quoted_state = function(buffer) {
+ 	var data = buffer.shift(1);
+ 	if(data == "'") {
++        	this.current_token.data.last().valueLoc.end = buffer.pos;
+ 		this.state = 'after_attribute_value_state';
+ 	} else if(data == '&') {
+ 		this.process_entity_in_attribute(buffer);
+@@ -547,16 +587,19 @@
+ t.prototype.attribute_value_unquoted_state = function(buffer) {
+ 	var data = buffer.shift(1);
+ 	if(HTML5.SPACE_CHARACTERS_R.test(data)) {
++        	this.current_token.data.last().valueLoc.end = buffer.pos - 1;
+ 		this.state = 'before_attribute_name_state';
+ 	} else if(data == '&') {
+ 		this.process_entity_in_attribute(buffer);
+ 	} else if(data == '>') {
++        	this.current_token.data.last().valueLoc.end = buffer.pos - 1;
+ 		this.emit_current_token();
+ 	} else if(data == '"' || data == "'" || data == '=') {
+ 		this.parse_error("unexpected-character-in-unquoted-attribute-value");
+ 		this.current_token.data.last().nodeValue += data;
+ 	} else if(data == HTML5.EOF) {
+ 		this.parse_error("eof-in-attribute-value-no-quotes");
++        	this.current_token.data.last().valueLoc.end = buffer.pos;
+ 		this.emit_current_token();
+ 	} else {
+ 		var o = buffer.matchUntil("["+ HTML5.SPACE_CHARACTERS_IN + '&<>' +"]")
+@@ -568,11 +611,17 @@
+ t.prototype.after_attribute_value_state = function(buffer) {
+ 	var data = buffer.shift(1);
+ 	if(HTML5.SPACE_CHARACTERS_R.test(data)) {
++        	var loc = this.current_token.data.last().valueLoc;
++        	if (!loc.end) loc.end = buffer.pos;
+ 		this.state = 'before_attribute_name_state';
+ 	} else if(data == '>') {
++        	var loc = this.current_token.data.last().valueLoc;
++        	if (!loc.end) loc.end = buffer.pos - 1;
+ 		this.emit_current_token();
+ 		this.state = 'data_state';
+ 	} else if(data == '/') {
++        	var loc = this.current_token.data.last().valueLoc;
++        	if (!loc.end) loc.end = buffer.pos - 1;
+ 		this.state = 'self_closing_tag_state';
+ 	} else if(data == HTML5.EOF) {
+ 		this.parse_error( "unexpected-EOF-after-attribute-value");
+@@ -580,6 +629,7 @@
+ 		buffer.unget(data);
+ 		this.state = 'data_state';
+ 	} else {
++                this.tok_end = buffer.pos - data.length; // account for following call to 'unget'
+ 		this.emitToken({type: 'ParseError', data: "unexpected-character-after-attribute-value"});
+ 		buffer.unget(data);
+ 		this.state = 'before_attribute_name_state';
+@@ -827,7 +877,8 @@
+ 		break;
+ 	}
+ 	if (this.current_token.name == "script" && tok.type == 'EndTag') {
+-		this.emitToken({ type: 'Characters', data: this.script_buffer });
++                var pos = this.tok_start;
++		this.emitToken({ type: 'Characters', data: this.script_buffer, loc: new Location(pos - this.script_buffer.length, pos)});
+ 		this.script_buffer = null;
+ 	}
+ 	this.emitToken(tok);
+@@ -848,11 +899,11 @@
+ 			var data = {};
+ 			token.data.reverse();
+ 			token.data.forEach(function(e) {
+-				data[e.nodeName.toLowerCase()] = e.nodeValue;
++				data[e.nodeName.toLowerCase()] = {value: e.nodeValue, loc: {name: e.nameLoc, value: e.valueLoc}};
+ 			});
+ 			token.data = [];
+ 			for(var k in data) {
+-				token.data.push({nodeName: k, nodeValue: data[k]});
++				token.data.push({nodeName: k, nodeValue: data[k].value, loc: data[k].loc});
+ 			}
+ 		}
+ 	} else if(token.type == 'EndTag') {
+diff -ru orig/node_modules/html5/lib/html5/treebuilder.js new/node_modules/html5/lib/html5/treebuilder.js
+--- orig/node_modules/html5/lib/html5/treebuilder.js	2011-11-15 23:33:03.000000000 -0500
++++ new/node_modules/html5/lib/html5/treebuilder.js	2012-03-23 23:16:17.000000000 -0400
+@@ -6,6 +6,7 @@
+ 	this.open_elements = [];
+ 	this.document = document;
+ 	this.activeFormattingElements = [];
++        this.last_element = undefined;
+ }
+ 
+ b.prototype.reset = function() {
+@@ -18,8 +19,11 @@
+ 	} else {
+         try {
+             element.setAttribute(attribute.nodeName, attribute.nodeValue)
++            if (!element.attrloc) element.attrloc = {};
++            element.attrloc[attribute.nodeName] = attribute.loc;
+         } catch(e) {
+             console.log("Can't set attribute '" + attribute.nodeName + "' to value '" + attribute.nodeValue + "': (" + e + ')');
++            throw dne();
+         }
+ 		if(attribute.namespace) {
+ 			var at = element.getAttributeNode(attribute.nodeName);
+@@ -34,6 +38,7 @@
+     } catch(e) {
+         console.log("Can't create element '"+ name + "' (" + e + ")")
+     }
++    this.last_element = el;
+     el.namespace = namespace;
+     if(attributes) {
+         if(attributes.item) {
+@@ -92,6 +97,7 @@
+ b.prototype.insert_comment = function(data, parent) {
+     try {
+         var c = this.document.createComment(data);
++        this.last_element = c;
+         if(!parent) parent = this.open_elements.last();
+         parent.appendChild(c);
+     } catch(e) {
+@@ -102,6 +108,7 @@
+ b.prototype.insert_doctype = function (name, publicId, systemId) {
+     try {
+         var doctype = this.document.implementation.createDocumentType(name, publicId, systemId);
++        this.last_element = doctype;
+         this.document.appendChild(doctype);
+     } catch(e) {
+         console.log("Can't create doctype ("+ name + " / " + publicId + " / " + systemId + ")")
+@@ -114,9 +121,11 @@
+ 	if(!this.insert_from_table || HTML5.TABLE_INSERT_MODE_ELEMENTS.indexOf(this.open_elements.last().tagName.toLowerCase()) == -1) {
+ 		if(parent.lastChild && parent.lastChild.nodeType == parent.TEXT_NODE) {
+ 			parent.lastChild.appendData(data);
++                        this.last_element = parent.lastChild;
+ 		} else {
+             try {
+                 var tn = this.document.createTextNode(data);
++                this.last_element = tn;
+                 parent.appendChild(tn);
+             } catch(e) {
+                 console.log("Can't create tex node (" + data + ")");
+@@ -157,6 +166,7 @@
+ 	} else {
+ 		node.appendChild(t)
+ 	}
++        this.last_element = t;
+ }
+ 
+ b.prototype.getTableMisnestedNodePosition = function() {
