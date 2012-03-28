@@ -27,4 +27,4 @@ done
 cd "${0%/*}" 2>/dev/null
 
 # Start the proxy
-node "${node_options[@]}" ./lib/proxy.js "${proxy_options[@]}"
+node "${node_options[@]}" ./lib/main.js "${proxy_options[@]}"
