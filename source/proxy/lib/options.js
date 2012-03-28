@@ -79,7 +79,7 @@ var options = [
 
     {
         long        : 'enable-log',
-        description : 'Enabling the activity log in the recorded profile (expensive)',
+        description : 'Enable the activity log in the recorded profile (expensive)',
         callback    : function () {
             exports.enableLogging = true;
         }
