@@ -436,42 +436,28 @@ Scanner.prototype.hexadecimal_class = function (c)
            (c >= UPPER_A_CH && c <= UPPER_F_CH);
 };
 
-// method parse_identifier()
+// method get_keyword(id)
 
-Scanner.prototype.parse_identifier_old = function ()
+Scanner.prototype.get_keyword = function (id)
 {
-    // This iterative algorithm extends the Array of characters using the
-    // "push" method.  The growth of the array generates garbage.
-
-    var start_pos = this.lookahead_pos(0);
-    var chars = [];
     var h = 0;
-    for (;;)
-    {
-        var c = this.lookahead_char(0);
-        if (!(this.identifier_class(c) || this.decimal_class(c)))
-            break;
-        this.advance(1);
-        chars.push(c);
-        h = (h * HASH_MULT + c) % HASH_MOD;
-    }
-    var id = String.fromCharCode.apply(null,chars);
+    for (var i=0; i<id.length; i++)
+        h = (h * HASH_MULT + id.charCodeAt(i)) % HASH_MOD;
     var x = keyword_hashtable[h];
-    if (x !== null && x.id === id)
-        return this.valued_token(x.cat, id, start_pos);
+    if (x === null || x.id !== id)
+        return null;
     else
-        return this.valued_token(IDENT_CAT, id, start_pos);
-};
+        return x;
+}
+
+// method parse_identifier()
 
 Scanner.prototype.parse_identifier = function ()
 {
     var start_pos = this.lookahead_pos(0);
     var id = this.parse_identifier_string();
-    var h = 0;
-    for (var i=0; i<id.length; i++)
-        h = (h * HASH_MULT + id.charCodeAt(i)) % HASH_MOD;
-    var x = keyword_hashtable[h];
-    if (x !== null && x.id === id)
+    var x = this.get_keyword(id);
+    if (x !== null && x.enabled === true)
         return this.valued_token(x.cat, id, start_pos);
     else
         return this.valued_token(IDENT_CAT, id, start_pos);
@@ -1126,62 +1112,62 @@ var keyword_hashtable =
 ,null
 ,null
 ,null
-,{ id: "future", cat: FUTURE_CAT }
+,{ id: "future", cat: FUTURE_CAT, enabled: true }
 ,null
 ,null
-,{ id: "void", cat: VOID_CAT }
-,{ id: "null", cat: NULL_CAT }
+,{ id: "void", cat: VOID_CAT, enabled: true }
+,{ id: "null", cat: NULL_CAT, enabled: true }
 ,null
 ,null
-,{ id: "export", cat: EXPORT_CAT }
-,{ id: "yield", cat: YIELD_CAT }
+,{ id: "export", cat: EXPORT_CAT, enabled: true }
+,{ id: "yield", cat: YIELD_CAT, enabled: true }
 ,null
 ,null
 ,null
 ,null
-,{ id: "return", cat: RETURN_CAT }
+,{ id: "return", cat: RETURN_CAT, enabled: true }
 ,null
 ,null
 ,null
-,{ id: "case", cat: CASE_CAT }
-,{ id: "while", cat: WHILE_CAT }
+,{ id: "case", cat: CASE_CAT, enabled: true }
+,{ id: "while", cat: WHILE_CAT, enabled: true }
 ,null
 ,null
 ,null
-,{ id: "debugger", cat: DEBUGGER_CAT }
-,{ id: "new", cat: NEW_CAT }
+,{ id: "debugger", cat: DEBUGGER_CAT, enabled: true }
+,{ id: "new", cat: NEW_CAT, enabled: true }
 ,null
 ,null
-,{ id: "continue", cat: CONTINUE_CAT }
+,{ id: "continue", cat: CONTINUE_CAT, enabled: true }
 ,null
-,{ id: "private", cat: PRIVATE_CAT }
+,{ id: "private", cat: PRIVATE_CAT, enabled: true }
 ,null
 ,null
-,{ id: "class", cat: CLASS_CAT }
+,{ id: "class", cat: CLASS_CAT, enabled: true }
 ,null
 ,null
 ,null
 ,null
 ,null
 ,null
-,{ id: "var", cat: VAR_CAT }
+,{ id: "var", cat: VAR_CAT, enabled: true }
 ,null
-,{ id: "const", cat: CONST_CAT }
+,{ id: "const", cat: CONST_CAT, enabled: true }
 ,null
-,{ id: "let", cat: LET_CAT }
+,{ id: "let", cat: LET_CAT, enabled: true }
 ,null
 ,null
 ,null
-,{ id: "else", cat: ELSE_CAT }
+,{ id: "else", cat: ELSE_CAT, enabled: true }
 ,null
 ,null
 ,null
 ,null
 ,null
-,{ id: "try", cat: TRY_CAT }
+,{ id: "try", cat: TRY_CAT, enabled: true }
 ,null
-,{ id: "break", cat: BREAK_CAT }
-,{ id: "function", cat: FUNCTION_CAT }
+,{ id: "break", cat: BREAK_CAT, enabled: true }
+,{ id: "function", cat: FUNCTION_CAT, enabled: true }
 ,null
 ,null
 ,null
@@ -1189,44 +1175,44 @@ var keyword_hashtable =
 ,null
 ,null
 ,null
-,{ id: "switch", cat: SWITCH_CAT }
-,{ id: "public", cat: PUBLIC_CAT }
+,{ id: "switch", cat: SWITCH_CAT, enabled: true }
+,{ id: "public", cat: PUBLIC_CAT, enabled: true }
 ,null
 ,null
 ,null
-,{ id: "do", cat: DO_CAT }
+,{ id: "do", cat: DO_CAT, enabled: true }
 ,null
 ,null
 ,null
-,{ id: "if", cat: IF_CAT }
-,{ id: "with", cat: WITH_CAT }
+,{ id: "if", cat: IF_CAT, enabled: true }
+,{ id: "with", cat: WITH_CAT, enabled: true }
 ,null
 ,null
-,{ id: "finally", cat: FINALLY_CAT }
+,{ id: "finally", cat: FINALLY_CAT, enabled: true }
 ,null
 ,null
 ,null
-,{ id: "in", cat: IN_CAT }
+,{ id: "in", cat: IN_CAT, enabled: true }
 ,null
-,{ id: "default", cat: DEFAULT_CAT }
+,{ id: "default", cat: DEFAULT_CAT, enabled: true }
 ,null
-,{ id: "catch", cat: CATCH_CAT }
-,{ id: "throw", cat: THROW_CAT }
+,{ id: "catch", cat: CATCH_CAT, enabled: true }
+,{ id: "throw", cat: THROW_CAT, enabled: true }
 ,null
-,{ id: "implements", cat: IMPLEMENTS_CAT }
-,{ id: "extends", cat: EXTENDS_CAT }
-,{ id: "true", cat: TRUE_CAT }
+,{ id: "implements", cat: IMPLEMENTS_CAT, enabled: true }
+,{ id: "extends", cat: EXTENDS_CAT, enabled: true }
+,{ id: "true", cat: TRUE_CAT, enabled: true }
 ,null
-,{ id: "instanceof", cat: INSTANCEOF_CAT }
+,{ id: "instanceof", cat: INSTANCEOF_CAT, enabled: true }
 ,null
-,{ id: "this", cat: THIS_CAT }
+,{ id: "this", cat: THIS_CAT, enabled: true }
 ,null
 ,null
 ,null
 ,null
-,{ id: "interface", cat: INTERFACE_CAT }
+,{ id: "interface", cat: INTERFACE_CAT, enabled: true }
 ,null
-,{ id: "false", cat: FALSE_CAT }
+,{ id: "false", cat: FALSE_CAT, enabled: true }
 ,null
 ,null
 ,null
@@ -1236,29 +1222,29 @@ var keyword_hashtable =
 ,null
 ,null
 ,null
-,{ id: "atomic", cat: ATOMIC_CAT }
+,{ id: "atomic", cat: ATOMIC_CAT, enabled: true }
 ,null
-,{ id: "import", cat: IMPORT_CAT }
+,{ id: "import", cat: IMPORT_CAT, enabled: true }
 ,null
 ,null
 ,null
-,{ id: "super", cat: SUPER_CAT }
-,{ id: "static", cat: STATIC_CAT }
+,{ id: "super", cat: SUPER_CAT, enabled: true }
+,{ id: "static", cat: STATIC_CAT, enabled: true }
 ,null
 ,null
 ,null
 ,null
 ,null
-,{ id: "protected", cat: PROTECTED_CAT }
-,{ id: "delete", cat: DELETE_CAT }
-,{ id: "package", cat: PACKAGE_CAT }
-,{ id: "enum", cat: ENUM_CAT }
+,{ id: "protected", cat: PROTECTED_CAT, enabled: true }
+,{ id: "delete", cat: DELETE_CAT, enabled: true }
+,{ id: "package", cat: PACKAGE_CAT, enabled: true }
+,{ id: "enum", cat: ENUM_CAT, enabled: true }
 ,null
 ,null
 ,null
 ,null
 ,null
-,{ id: "for", cat: FOR_CAT }
+,{ id: "for", cat: FOR_CAT, enabled: true }
 ,null
 ,null
 ,null
@@ -1266,7 +1252,7 @@ var keyword_hashtable =
 ,null
 ,null
 ,null
-,{ id: "typeof", cat: TYPEOF_CAT }
+,{ id: "typeof", cat: TYPEOF_CAT, enabled: true }
 ];
 //END-OF-SCANNER-TABLES
 

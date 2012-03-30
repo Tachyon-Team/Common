@@ -141,7 +141,7 @@ function String_input_port(content, filename)
 {
     if (filename === undefined)
         filename = '<string>';
-
+if (content.length > 0 && content.charCodeAt(content.length-1) !== 10) content = content + "\n";
     this.filename = filename;
     this.content = content;
     this.pos = 0;

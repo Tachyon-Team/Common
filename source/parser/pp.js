@@ -1122,7 +1122,7 @@ function generate_html_listing(input_filenames, options)
                   : options.lineno_width,
                 page_width:
                   (options.page_width === undefined)
-                  ? 79
+                  ? 80
                   : options.page_width,
                 full_html:
                   (options.full_html === undefined)
@@ -1165,7 +1165,7 @@ function generate_html_listing_to_port(input_filename, oport, options)
 
     if (c >= 0)
     {
-        function start_line()
+        function start_line(line)
         {
             oport.write_string(options.start_line(input_filename, line+1));
         }
@@ -1174,14 +1174,17 @@ function generate_html_listing_to_port(input_filename, oport, options)
         {
             // pad line to page width
 
-            while (column <= options.page_width)
+            if (options.page_width > 0)
             {
-                oport.write_char(32);
-                column++;
+                while (column === 0 || column % options.page_width !== 0)
+                {
+                    oport.write_char(32);
+                    column++;
+                }
             }
         }
 
-        start_line();
+        start_line(line);
 
         while (c >= 0)
         {
@@ -1204,14 +1207,15 @@ function generate_html_listing_to_port(input_filename, oport, options)
             {
                 pad_right();
 
-                oport.write_char(c);
+                oport.write_string("\n");
+                //oport.write_char(c);
 
                 if (c === CR_CH)
                 {
                     c = iport.read_char();
                     if (c === LF_CH)
                     {
-                        oport.write_char(c);
+                        //oport.write_char(c);
                         c = iport.read_char();
                     }
                 }
@@ -1226,13 +1230,26 @@ function generate_html_listing_to_port(input_filename, oport, options)
             }
             else
             {
+                if (options.page_width > 0)
+                {
+                    if (column > 0 && column % options.page_width === 0)
+                    {
+                        oport.write_string("<small><span style=\"color:red;\">&#8617;</span></small>\n") // LEFTWARDS ARROW WITH HOOK
+                        start_line(-1);
+                    }
+                }
+
                 // TODO: should probably escape other characters too
+
                 if (c === LT_CH)
                     oport.write_string("&lt;")
                 else if (c === GT_CH)
                     oport.write_string("&gt;")
+                else if (c === AMPERSAND_CH)
+                    oport.write_string("&amp;")
                 else
                     oport.write_char(c);
+
                 c = iport.read_char();
                 column++;
             }
@@ -1252,12 +1269,23 @@ function syntax_highlighting(input_filenames, options)
         if (lineno_width === 0)
             return "";
 
-        var id = string_to_id("\"" + input_filename + "\"@" + line);
+        var blanks = Array(lineno_width+1).join(" ");
 
-        return "<span class=\"lineinfo\" id=\"" + id + "\">" +
-               "<span class=\"lineno\">" + (Array(lineno_width).join(" ")+line).substr(-lineno_width) + ":</span>" +
-               "<span class=\"linespace\"> </span>" +
-               "</span>";
+        if (line === 0)
+        {
+            return "<span class=\"lineinfo\">" +
+                   "<span class=\"lineno\">" + blanks + " </span>" +
+                   "<span class=\"linespace\"> </span>" +
+                   "</span>";
+        }
+        else
+        {
+            var id = string_to_id("\"" + input_filename + "\"@" + line);
+            return "<span class=\"lineinfo\" id=\"" + id + "\">" +
+                   "<span class=\"lineno\">" + (blanks+line).substr(-lineno_width) + ":</span>" +
+                   "<span class=\"linespace\"> </span>" +
+                   "</span>";
+        }
     }
 
     function get_insertions(input_filename)
@@ -1286,7 +1314,7 @@ function syntax_highlighting(input_filenames, options)
                   : options.lineno_width,
                 page_width:
                   (options.page_width === undefined)
-                  ? 79
+                  ? 80
                   : options.page_width,
                 full_html:
                   (options.full_html === undefined)
