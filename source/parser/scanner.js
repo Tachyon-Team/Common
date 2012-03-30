@@ -459,6 +459,8 @@ Scanner.prototype.parse_identifier = function ()
     var x = this.get_keyword(id);
     if (x !== null && x.enabled === true)
         return this.valued_token(x.cat, id, start_pos);
+    else if (x !== null)
+        return this.valued_token(IDENT_CAT, id + "_", start_pos);
     else
         return this.valued_token(IDENT_CAT, id, start_pos);
 };
