@@ -112,7 +112,7 @@ Anonymous function to initialize this library
 Object.getPrototypeOf = function (obj)
 {
     assert (
-        boxIsObjExt(obj),
+        boxIsExtObj(obj),
         'non-object value in getPrototypeOf'
     );
 
@@ -127,7 +127,7 @@ FIXME: for now, no property attributes
 */
 Object.getOwnPropertyDescriptor = function (O, P)
 {
-    if (boxIsObjExt(O) === false)
+    if (boxIsExtObj(O) === false)
         typeError('invalid object in getOwnPropertyDescriptor');
 
     name = boxToString(P);
@@ -140,7 +140,7 @@ Object.getOwnPropertyDescriptor = function (O, P)
 */
 Object.getOwnPropertyNames = function (O)
 {
-    if (boxIsObjExt(O) === false)
+    if (boxIsExtObj(O) === false)
         typeError('invalid object in getOwnPropertyNames');
 
     var propNames = [];
@@ -159,7 +159,7 @@ Object.getOwnPropertyNames = function (O)
 */
 Object.create = function (O, Properties)
 {
-    if (boxIsObjExt(O) === false && obj !== null)
+    if (boxIsExtObj(O) === false && obj !== null)
     {
         typeError('can only create object from object or null prototype');
     }
@@ -179,7 +179,7 @@ FIXME: for now, we ignore most attributes
 Object.defineProperty = function (obj, prop, attribs)
 {
     assert (
-        boxIsObjExt(obj),
+        boxIsExtObj(obj),
         'non-object value in defineProperty'
     );
 
@@ -192,7 +192,7 @@ Object.defineProperty = function (obj, prop, attribs)
 */
 Object.defineProperties = function (O, Properties)
 {
-    if (boxIsObjExt(O) === false)
+    if (boxIsExtObj(O) === false)
         typeError('invalid object in defineProperties');
 
     for (name in Properties)
@@ -207,7 +207,7 @@ FIXME: noop function for now
 */
 Object.seal = function (O)
 {
-    if (boxIsObjExt(O) === false)
+    if (boxIsExtObj(O) === false)
         typeError('invalid object in seal');
 
     return O;
@@ -219,7 +219,7 @@ FIXME: noop function for now
 */
 Object.freeze = function (O)
 {
-    if (boxIsObjExt(O) === false)
+    if (boxIsExtObj(O) === false)
         typeError('invalid object in freeze');
 
     return O;
@@ -231,7 +231,7 @@ FIXME: noop function for now
 */
 Object.preventExtensions = function (O)
 {
-    if (boxIsObjExt(O) === false)
+    if (boxIsExtObj(O) === false)
         typeError('invalid object in preventExtensions');
 
     return O;
@@ -243,7 +243,7 @@ FIXME: noop function for now
 */
 Object.isSealed = function (O)
 {
-    if (boxIsObjExt(O) === false)
+    if (boxIsExtObj(O) === false)
         typeError('invalid object in isSealed');
 
     return false; 
@@ -255,7 +255,7 @@ FIXME: for now, all objects are extensible
 */
 Object.isFrozen = function (O)
 {
-    if (boxIsObjExt(O) === false)
+    if (boxIsExtObj(O) === false)
         typeError('invalid object in isFrozen');
 
     return false;
@@ -267,7 +267,7 @@ FIXME: for now, all objects are extensible
 */
 Object.isExtensible = function (O)
 {
-    if (boxIsObjExt(O) === false)
+    if (boxIsExtObj(O) === false)
         typeError('invalid object in isExtensible');
 
     return true;
@@ -278,7 +278,7 @@ Object.isExtensible = function (O)
 */
 Object.keys = function (O)
 {
-    if (boxIsObjExt(O) === false)
+    if (boxIsExtObj(O) === false)
         typeError('invalid object in keys');
 
     var propNames = [];

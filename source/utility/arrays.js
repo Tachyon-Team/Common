@@ -186,23 +186,6 @@ function arrayRange(from, to, step)
     return a;
 }
 
-/**
-Returns the index of the first element for which
-func returns true, -1 if none.
-*/
-function arrayFind(arr, func)
-{
-    for (var i = 0; i < arr.length; ++i)
-    {
-        if (func(arr[i]))
-        {
-            return i;
-        }   
-    }
-
-    return -1;
-}
-
 function arrayDirectConcat(array1, array2)
 {
     for (var i = 0; i < array2.length; ++i)

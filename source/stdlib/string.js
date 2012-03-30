@@ -69,7 +69,7 @@ function String(value)
         this.value = strVal;
 
         // Set length property.
-        this.length = string_internal_getLength(strVal);
+        this.length = strVal.length;
     }
     else
     {
