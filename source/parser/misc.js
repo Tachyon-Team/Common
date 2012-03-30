@@ -48,11 +48,22 @@
 
 //=============================================================================
 
+/* support node.js as an alternative to our V8 extensions */
+var node_js_mode = (typeof exports !== "undefined");
+var fs;
+if (node_js_mode) {
+    fs = require('fs');
+}
+
 // Interface to D8 specific functions.
 
 function read_file(filename)
 {
-    return readFile(filename);
+    if (node_js_mode) {
+        return fs.readFileSync(filename, 'ascii');
+    } else {
+        return readFile(filename);
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -67,6 +78,63 @@ function File_input_port(filename)
         read_file(filename),
         filename
     );
+}
+
+function File_output_port(filename, init)
+{
+    if (node_js_mode)
+    {
+        function NodeJS_output_port(filename, init)
+        {
+            this.stream = fs.createWriteStream(filename, {flags : 'w'});
+
+            this.empty_char_buffer = function ()
+            {
+                this.flush();
+            };
+
+            this.write_char = function (c)
+            {
+                this.stream.write(c, 'ascii');
+            };
+
+            this.write_string = function (str)
+            {
+                this.stream.write(str, 'ascii');
+            };
+
+            this.flush = function ()
+            {
+                // noop - not supported in node.js
+            };
+
+            this.close = function ()
+            {
+                this.stream.end();
+                this.stream.destroySoon();
+            };
+
+            if (init !== undefined) this.write_string(init);
+        }
+
+        return new NodeJS_output_port(filename, init);
+    } else {
+        var port = new String_output_port(init);
+        port.filename = filename;
+
+        port.flush = function ()
+        {
+            writeFile(this.filename, this.get_output_string());
+        };
+
+        port.close = function ()
+        {
+            // TODO: support real closing
+            this.flush();
+        };
+
+        return port;
+    }
 }
 
 function String_input_port(content, filename)
@@ -129,7 +197,7 @@ function String_output_port(init)
         return String.prototype.concat.apply("", this.string_buffer);
     };
 
-    this.write_string(init);
+    if (init !== undefined) this.write_string(init);
 }
 
 //-----------------------------------------------------------------------------
@@ -175,8 +243,10 @@ function parse_src_port(port, params)
 //=============================================================================
 
 // Node.js support
-if (typeof exports !== "undefined")
+if (node_js_mode)
 {
     exports.String_input_port = String_input_port;
     exports.String_output_port = String_output_port;
+    exports.File_input_port = File_input_port;
+    exports.File_output_port = File_output_port;
 }

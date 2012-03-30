@@ -6,26 +6,77 @@
 #    brew install node.js
 #    ./install
 
-command -v node &>/dev/null || { echo "node not found. Please install node.js and add it to your path." >&2; exit 1; }
-command -v npm &>/dev/null || { echo "npm not found. Please install npm and add it to your path." >&2; exit 1; }
+FORCE=
+for arg in $*; do
+    case "$arg" in
+        -f|--force)
+            FORCE=1
+            shift
+            ;;
+        *)
+            echo "Unrecognized option: ${arg}";
+            echo
+            echo "Usage: `basename $0` [-f|--force]"
+            exit 1;
+            ;;
+    esac
+done
+
+command -v node &>/dev/null || { 
+    echo "node command not found. Please install node.js and add it to your path." >&2;
+    echo "On a mac, the recommended installation method is via homebrew:"
+    echo "    brew install node"
+    exit 1;
+}
+
+command -v npm &>/dev/null || {
+    echo "npm not found. Please install npm and add it to your path." >&2;
+    echo "npm can usually be installed using the following command:"
+    echo "    curl http://npmjs.org/install.sh | sh"
+    exit 1;
+}
+
+install_module() {
+    local module=$1; shift
+    local version=$1; shift
+    if [ ! -z "${version}" ]; then
+        version=@${version}
+    fi
+
+    if [ ! -z "${FORCE}" ]; then
+        rm -fr "./node_modules/${module}"
+    fi
+
+    if [ ! -d "./node_modules/${module}" ]; then
+        echo "----------------------------------------"
+        echo "Installing ${module}"
+        echo "----------------------------------------"
+        echo
+        npm install "${module}${version}" || { echo "Installation failed" >&2; exit 1; }
+
+        for p in $*; do
+            echo "Applying ${p}"
+            patch -p1 < "patch/${p}" || { echo "Patch failed" >&2; exit 1; }
+        done
+        echo
+    fi
+}
 
 # Install required dependencies
-echo "Checking node.js dependencies"
+install_module jsdom "0.2.13"
+install_module opts "1.2.2"
+install_module html5 "v0.3.5" "html5-loc.patch"
+install_module buffertools "1.0.6"
+install_module jasmine-node
 
-if [ ! -d "./node_modules/jsdom" ]; then
-    echo "  * Installing jsdom"
-    npm install jsdom || { echo "Installation failed" >&2; exit 1; }
-
-    #echo "    Patching jsdom"
-    #patch -p1 < patch/jsdom.patch || { echo "Patch failed" >&2; exit 1; }
-    echo "    Patching htmlparser"
-    patch -p1 < patch/htmlparser.patch || { echo "Patch failed" >&2; exit 1; }
-fi
-
-if [ ! -d "./node_modules/buffertools" ]; then
-    echo "  * Installing buffertools"
-    npm install buffertools || { echo "Installation failed" >&2; exit 1; }
-fi
-
+echo
+echo "----------------------------------------"
 echo "Installation completed."
+echo "IMPORTANT: you need to run 'make' from the parser directory in order to"
+echo "generate 'js2js-lib.js'"
+echo 
 echo "You can start the proxy using the 'run-proxy' script."
+echo "To learn about the available options, run the following command:"
+echo "    ./run-proxy --help"
+echo "----------------------------------------"
+echo

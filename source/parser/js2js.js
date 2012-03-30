@@ -59,7 +59,8 @@ function main()
                     debug: false,
                     warn: false,
                     ast: false,
-                    nojs: false
+                    nojs: false,
+                    simplify: true
                   };
     var i = 0;
 
@@ -79,6 +80,8 @@ function main()
             options.ast = true;
         else if (args[i] === "-nojs")
             options.nojs = true;
+        else if (args[i] === "-raw")
+            options.simplify = false;
         else
             break;
         i++;
@@ -101,7 +104,7 @@ function main()
                            new BlockStatement(prog.loc,
                                               Array.prototype.concat.apply([], statements)));
 
-        var normalized_prog = ast_normalize(prog, options);
+        var normalized_prog = options.simplify ? ast_normalize(prog, options) : prog;
 
         if (options.ast)
             pp(normalized_prog);

@@ -962,6 +962,7 @@ var LT_CH          =  60;
 var EQUAL_CH       =  61;
 var GT_CH          =  62;
 var QUESTION_CH    =  63;
+var AT_CH          =  64;
 var UPPER_A_CH     =  65;
 var UPPER_B_CH     =  66;
 var UPPER_D_CH     =  68;
@@ -1275,4 +1276,7 @@ var keyword_hashtable =
 if (typeof exports !== "undefined")
 {
     exports.Scanner = Scanner;
+    exports.position_to_line = position_to_line;
+    exports.position_to_column = position_to_column;
+    exports.line_and_column_to_position = line_and_column_to_position;
 }

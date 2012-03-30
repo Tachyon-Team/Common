@@ -114,7 +114,7 @@ Parser.prototype.error = function (loc, msg)
 
 Parser.prototype.warning = function (loc, msg)
 {
-    log.warn(loc.to_string() + ": warning -- " + msg);
+    print(loc.to_string() + ": warning -- " + msg);
 };
 
 
@@ -364,7 +364,7 @@ Parser.prototype.parse = function ()
                     a = t[i];
                 }
 
-                if (autosemicolon_index !== 0)
+                if (normal_index === 0 && autosemicolon_index !== 0)
                 {
                     autosemicolon_inserted = true;
                     a = t[autosemicolon_index];

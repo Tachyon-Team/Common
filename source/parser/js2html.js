@@ -40,101 +40,59 @@
  * _________________________________________________________________________
  */
 
-/**
-@fileOverview
-Basic system/OS interface functions.
+//=============================================================================
 
-@author
-Maxime Chevalier-Boisvert
+// File: "js2html.js"
 
-@copyright
-Copyright (c) 2010 Maxime Chevalier-Boisvert, All Rights Reserved
-*/
+// Copyright (c) 2012 by Marc Feeley, All Rights Reserved.
 
-/**
-Store the command-line arguments in a globally visible variable.
-*/
-var command_line_arguments = [];
+//=============================================================================
 
-if (typeof arguments !== "undefined") /* make it work in the browser */
-    command_line_arguments = arguments;
-else if (typeof process !== "undefined") /* support node.js as an alternative */
-    command_line_arguments = process.argv.slice(2)
-
-/**
-Get the command-line arguments
-*/
-function command_line()
-{
-    return command_line_arguments;
-}
-
-/**
-Parse command-line arguments
-*/
-function parseCmdLine()
+function main()
 {
     var args = command_line();
+    var options = { output: undefined,
+                    lineno_width: undefined,
+                    page_width: undefined
+                  };
+    var input_filenames = [];
+    var i = 0;
 
-    // Map for named arguments
-    var options = {};
-
-    // List for trailing unnamed arguments
-    var files = [];
-
-    var argIdx = 0;
-
-    // For each named argument
-    for (; argIdx < args.length; argIdx++)
+    while (i < args.length)
     {
-        var arg = args[argIdx];
-
-        // If this is not an option argument, stop
-        if (arg.charAt(0) !== '-')
-            break;
-
-        // Get the option name
-        var optName = arg.slice(1);
-
-        if (optName === 'e')
-        {
-            ++argIdx;
-            if (argIdx >= args.length)
-            {
-                error("No argument specified for -e");
-            }
-            var optVal = args[argIdx];
-        }
+        if (args[i] === "-output")
+            options.output = args[++i];
+        else if (args[i] === "-lineno-width")
+            options.lineno_width = Number(args[++i]);
+        else if (args[i] === "-page-width")
+            options.page_width = Number(args[++i]);
         else
-        {
-            var eqIndex = optName.indexOf("=");
-
-            if (eqIndex === -1)
-            {
-                var optVal = true;
-            }
-            else
-            {
-                var optVal = optName.slice(eqIndex+1);
-                optName = optName.slice(0, eqIndex);
-            }
-        }
-
-        // Store the option value
-        options[optName] = optVal;
+            break;
+        i++;
     }
 
-    // For each remaining argument
-    for (; argIdx < args.length; ++argIdx)
+    while (i < args.length)
     {
-        // Add it to the file arguments
-        files.push(args[argIdx]);
+        input_filenames.push(args[i]);
+        i++;
     }
 
-    // Return the parsed arguments
-    return {
-        "options"   : options,
-        "files"     : files
-    };
+    syntax_highlighting(input_filenames,
+                        { output_filenames:
+                            options.output === undefined
+                            ? undefined
+                            : options.output,
+                          lineno_width:
+                            options.lineno_width === undefined
+                            ? undefined
+                            : options.lineno_width,
+                          page_width:
+                            options.page_width === undefined
+                            ? undefined
+                            : options.page_width
+                        });
 }
 
+main();
+
+//=============================================================================

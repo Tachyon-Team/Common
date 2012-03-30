@@ -10,7 +10,7 @@
 #  http://github.com/Tachyon-Team/Tachyon
 #
 #
-#  Copyright (c) 2011, Universite de Montreal
+#  Copyright (c) 2012, Universite de Montreal
 #  All rights reserved.
 #
 #  This software is licensed under the following license (Modified BSD
@@ -42,60 +42,38 @@
 # _________________________________________________________________________
 
 
-OPT_PROFILE=""
-OPT_NAMESPACE=""
-OPT_EXPORTS=""
-OPT_DEBUG=""
-OPT_WARN=""
-OPT_AST=""
-OPT_JS=""
+OPT_OUTPUT=""
+OPT_LINENO_WIDTH=""
+OPT_PAGE_WIDTH=""
 LAST_FILE=""
 FILES=""
 
 DIR=`dirname $0`
 
-JS2JS="d8 $DIR/../utility/debug.js $DIR/../utility/system.js $DIR/../utility/hashmap.js $DIR/../utility/num.js $DIR/misc.js $DIR/scanner.js $DIR/parser.js $DIR/pp.js $DIR/ast-passes.js $DIR/js2js.js --"
-
-# After a "make boostrap" this can be used instead:
-#
-#JS2JS="$DIR/js2js.js.exe"
+JS2HTML="d8 $DIR/../utility/debug.js $DIR/../utility/system.js $DIR/../utility/hashmap.js $DIR/../utility/num.js $DIR/misc.js $DIR/scanner.js $DIR/parser.js $DIR/pp.js $DIR/ast-passes.js $DIR/js2html.js --"
 
 while [ "$1" != "" ]; do
   case "$1" in
-    "-profile") OPT_PROFILE="-profile" ;;
-  "-namespace") shift
-                OPT_NAMESPACE="-namespace $1" ;;
-     "-export") shift
-                OPT_EXPORTS="$OPT_EXPORTS -export $1" ;;
-      "-debug") OPT_DEBUG="-debug" ;;
-       "-warn") OPT_WARN="-warn" ;;
-        "-ast") OPT_AST="-ast" ;;
-         "-js") OPT_JS="-js" ;;
-         "-raw") OPT_RAW="-raw" ;;
-          "--") shift
-                break ;;
-          *.js) LAST_FILE="$1"
-                FILES="$FILES $LAST_FILE"
-                ;;
-             *) echo "Usage: $0 [-profile|-namespace <ns>|-export <id>|-debug|-warn|-ast|-js|-raw] file1.js file2.js ..."
-                exit 1
-                ;;
+        "-output") shift
+                   OPT_OUTPUT="-output $1" ;;
+  "-lineno-width") shift
+                   OPT_LINENO_WIDTH="-lineno-width $1" ;;
+    "-page-width") shift
+                   OPT_PAGE_WIDTH="-page-width $1" ;;
+             "--") shift
+                   break ;;
+             *.js) LAST_FILE="$1"
+                   FILES="$FILES $LAST_FILE"
+                   ;;
+                *) echo "Usage: $0 [-output file] [-lineno-width N] [-page-width N] file1.js file2.js ..."
+                   exit 1
+                   ;;
   esac
   shift
 done
 
-if [ "$OPT_AST" != "" ]; then
-  if ! $JS2JS $OPT_PROFILE $OPT_NAMESPACE $OPT_EXPORTS $OPT_DEBUG $OPT_WARN $OPT_RAW -ast -nojs $FILES; then
-    exit 1
-  fi
-else
-  if ! $JS2JS $OPT_PROFILE $OPT_NAMESPACE $OPT_EXPORTS $OPT_DEBUG $OPT_WARN $OPT_RAW $FILES < /dev/null > $LAST_FILE.js; then
-    cat "$LAST_FILE.js"
-    rm -f "$LAST_FILE.js"
-    exit 1
-  fi
-  if [ "$OPT_JS" == "" ]; then
-    cat "$LAST_FILE.js"
-    rm -f "$LAST_FILE.js"
-  fi
+if [ "$OPT_OUTPUT" == "" ]; then
+  OPT_OUTPUT="-output $LAST_FILE.html"
 fi
+
+$JS2HTML $OPT_OUTPUT $OPT_LINENO_WIDTH $OPT_PAGE_WIDTH $FILES
