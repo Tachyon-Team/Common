@@ -1,5 +1,6 @@
 var opts = require('opts');
 var fs   = require('fs');
+var path = require('path');
 
 exports.DEBUG = false;
 
@@ -17,6 +18,8 @@ exports.key = fs.readFileSync('./data/key.pem');
 exports.cert = fs.readFileSync('./data/cert.pem');
 
 exports.outputDir = "output";
+exports.origOutputDir = "orig";
+exports.instOutputDir = "inst";
 
 // Dynamic exports
 exports.enableLogging = false;
@@ -24,7 +27,7 @@ exports.enableLogging = false;
 var options = [
     {  
         long        : 'record-js',
-        description : 'Record instrumented JavaScript source',
+        description : 'Record original and instrumented JavaScript source',
         callback    : function () {
             exports.recordSource = true;
             exports.recordInstrumentedSource = true;
@@ -33,8 +36,19 @@ var options = [
 
     {
         long        : 'record-html',
-        description : 'Record instrumented HTML files',
+        description : 'Record original and instrumented HTML files',
         callback    : function () {
+            exports.recordHTML = true;
+            exports.recordInstrumentedHTML = true;
+        }
+    },
+
+    {
+        long        : 'record-all',
+        description : 'Record all original and instrumented files (implies --record-html and --record-js)',
+        callback    : function () {
+            exports.recordSource = true;
+            exports.recordInstrumentedSource = true;
             exports.recordHTML = true;
             exports.recordInstrumentedHTML = true;
         }

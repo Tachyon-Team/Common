@@ -150,15 +150,21 @@ exports.innerHTMLHandler = {
             var args = querystr.parse(url.query);
             var data = helper.merge(chunks).toString("utf-8");
             var id = self.nextID++;
-            //recordSource(data, "innerhtml" + id);
             var instrumented_val;
             var content_type;
+            var fn = "innerhtml" + id;
             if (args.mode === "js") {
                 content_type = "text/javascript";
-                instrumented_val = options.profiler.processScript(data, "innerhtml" + id + ".js");
+                fn += ".js";
+                helper.recordSource(data, fn);
+                instrumented_val = options.profiler.processScript(data, fn);
+                helper.recordInstrumentedSource(instrumented_val, fn);
             } else {
                 content_type = "text/html";
-                instrumented_val = options.profiler.processHTML(data, "innerhtml" + id);
+                fn += ".html";
+                helper.recordHTML(data, fn);
+                instrumented_val = options.profiler.processHTML(data, fn);
+                helper.recordInstrumentedHTML(instrumented_val, fn);
             }
 
             var buffer;
@@ -167,7 +173,6 @@ exports.innerHTMLHandler = {
             } else {
                 buffer = instrumented_val;
             }
-            //recordInstrumentedSource(data, "innerhtml" + id);
 
             response.writeHead(200, {
                 'Content-Type': content_type,

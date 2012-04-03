@@ -273,7 +273,7 @@ Instrumentation.prototype.processHTML = function (data, filename) {
     }
 
     var html = applyChanges(changes, data);
-    helper.recordInstrumentedHTML(html, filename + ".instrumented");
+    helper.recordInstrumentedHTML(html, filename);
 
     return html;
 };
