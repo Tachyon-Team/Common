@@ -91,13 +91,6 @@ Scanner.prototype.read_char = function ()
 
 Scanner.prototype.get_char = function ()
 {
-    var c = this.get_char2();
-    print(c);
-    return c;
-}
-
-Scanner.prototype.get_char2 = function ()
-{
     var c = this.peeked_char;
 
     if (c !== null)
