@@ -57,8 +57,8 @@ var profile$call_loc = "unknown";
 var profile$nesting = -1;
 var profile$stack = [];
 var profile$object_infos = [];
-var profile$fn_abstypes = {};
-var profile$prop_access_abstypes = {};
+var profile$fn_absvals = {};
+var profile$prop_access_absvals = {};
 var profile$eval_counter = 0;
 var profile$fetch_counter = 0;
 var profile$store_counter = 0;
@@ -249,7 +249,7 @@ function profile$object_info(obj)
 
 function profile$get_tp_descr()
 {
-    return profile$fn_abstypes[profile$stack[profile$nesting]];
+    return profile$fn_absvals[profile$stack[profile$nesting]];
 }
 
 function profile$enter_tp(fn, args)
@@ -264,17 +264,17 @@ function profile$enter_tp(fn, args)
                   args: [],
                   result: undefined
                 };
-        profile$fn_abstypes[loc] = descr;
+        profile$fn_absvals[loc] = descr;
     }
     descr.calls++;
     for (var i=0; i<args.length; i++)
-        descr.args[i] = profile$abstype_add(descr.args[i], args[i]);
+        descr.args[i] = profile$absval_add(descr.args[i], args[i]);
 }
 
 function profile$return_tp(result)
 {
     var descr = profile$get_tp_descr();
-    descr.result = profile$abstype_add(descr.result, result);
+    descr.result = profile$absval_add(descr.result, result);
 }
 
 function profile$absnum_add(absnum, val)
@@ -298,6 +298,14 @@ function profile$absnum_to_string(absnum)
         return absnum.minnum + ".." + absnum.maxnum;
 }
 
+function profile$absbool_to_array(absbool)
+{
+    if (absnum.minnum === absnum.maxnum)
+        return ["" + absnum.minnum];
+    else
+        return [absnum.minnum + ".." + absnum.maxnum];
+}
+
 function profile$absbool_add(absbool, val)
 {
     if (absbool === undefined)
@@ -314,6 +322,16 @@ function profile$absbool_to_string(absbool)
     if (absbool[false] !== undefined)
     { if (str !== "") str += " U "; str += "false"; }
     return str;
+}
+
+function profile$absbool_to_array(absbool)
+{
+    var arr = [];
+    if (absbool[true] !== undefined)
+        arr.push("true");
+    if (absbool[false] !== undefined)
+        arr.push("false");
+    return arr;
 }
 
 function profile$absobj_add(absobj, val)
@@ -333,10 +351,18 @@ function profile$absobj_to_string(absobj)
     return str;
 }
 
-function profile$abstype_add(abstype, val)
+function profile$absobj_to_array(absobj)
 {
-    if (abstype === undefined)
-        abstype = { num: undefined,
+    var arr = [];
+    for (var x in absobj)
+        arr.push("map[" + x + "]");
+    return arr;
+}
+
+function profile$absval_add(absval, val)
+{
+    if (absval === undefined)
+        absval = { num: undefined,
                     str: undefined,
                     bool: undefined,
                     undef: undefined,
@@ -350,75 +376,138 @@ function profile$abstype_add(abstype, val)
         profile$object_info(val);
 
     if (typeof val === 'number')
-        abstype.num = profile$absnum_add(abstype.num, val);
+        absval.num = profile$absnum_add(absval.num, val);
     else if (typeof val === 'string')
-        abstype.str = profile$absnum_add(abstype.str, val.length);
+        absval.str = profile$absnum_add(absval.str, val.length);
     else if (typeof val === 'boolean')
-        abstype.bool = profile$absbool_add(abstype.bool, val);
+        absval.bool = profile$absbool_add(absval.bool, val);
     else if (val === undefined)
-        abstype.undef = true;
+        absval.undef = true;
     else if (val === null)
-        abstype.nul = true;
+        absval.nul = true;
     else if (typeof val === 'function')
-        abstype.fn = true;
+        absval.fn = true;
     else if (profile$is_object(val))
-        abstype.obj = profile$absobj_add(abstype.obj, val);
+        absval.obj = profile$absobj_add(absval.obj, val);
     else
-        abstype.other.push(val);
-    return abstype;
+        absval.other.push(val);
+    return absval;
 }
 
-function profile$abstype_to_string(abstype)
+function profile$absval_to_string(absval)
 {
     var str = "";
-    if (abstype !== undefined)
+    if (absval !== undefined)
     {
-      if (abstype.num !== undefined)
+      if (absval.num !== undefined)
       { if (str !== "") str += " U ";
-        str += profile$absnum_to_string(abstype.num);
+        str += profile$absnum_to_string(absval.num);
       }
-      if (abstype.str !== undefined)
+      if (absval.str !== undefined)
       { if (str !== "") str += " U ";
-        str += "string[" + profile$absnum_to_string(abstype.str) + "]";
+        str += "string[" + profile$absnum_to_string(absval.str) + "]";
       }
-      if (abstype.bool !== undefined)
+      if (absval.bool !== undefined)
       { if (str !== "") str += " U ";
-        str += profile$absbool_to_string(abstype.bool);
+        str += profile$absbool_to_string(absval.bool);
       }
-      if (abstype.undef !== undefined)
+      if (absval.undef !== undefined)
       { if (str !== "") str += " U ";
         str += "undefined";
       }
-      if (abstype.nul !== undefined)
+      if (absval.nul !== undefined)
       { if (str !== "") str += " U ";
         str += "null";
       }
-      if (abstype.fn !== undefined)
+      if (absval.fn !== undefined)
       { if (str !== "") str += " U ";
         str += "function";
       }
-      if (abstype.obj !== undefined)
+      if (absval.obj !== undefined)
       { if (str !== "") str += " U ";
-        str += profile$absobj_to_string(abstype.obj);
+        str += profile$absobj_to_string(absval.obj);
       }
-      if (abstype.other.length > 0)
+      if (absval.other.length > 0)
       { if (str !== "") str += " U ";
-        str += abstype.other.join(" U ");
+        str += absval.other.join(" U ");
       }
     }
     return str;
 }
 
+function profile$absval_to_array(absval)
+{
+    var arr = [];
+    if (absval !== undefined)
+    {
+        if (absval.num !== undefined)
+            arr = arr.concat(profile$absnum_to_array(absval.num));
+        if (absval.str !== undefined)
+            arr = arr.concat(["string[" + profile$absnum_to_string(absval.str) + "]"]);
+        if (absval.bool !== undefined)
+            arr = arr.concat(profile$absbool_to_array(absval.bool));
+        if (absval.undef !== undefined)
+            arr = arr.concat(["undefined"]);
+        if (absval.nul !== undefined)
+            arr = arr.concat(["null"]);
+        if (absval.fn !== undefined)
+            arr = arr.concat(["function"]);
+        if (absval.obj !== undefined)
+            arr = arr.concat(profile$absobj_to_array(absval.obj));
+        if (absval.other.length > 0)
+            arr = arr.concat(["other"]);
+    }
+    return arr;
+}
+
 function profile$report()
 {
+    var analysis_output = {};
+
+    analysis_output.declarations =
+        {
+            "absval" : { "title" : "Abstract value", "type" : "absval" },
+            "count"  : { "title" : "Dynamic count", "type" : "number" }
+        };
+
+    analysis_output.maps = {};
+
+    for (var i=0; i<profile$maps.length; i++)
+    { var map = profile$maps[i];
+      analysis_output.maps["map[" + map.id + "]"] = profile$map_to_string(map);
+    }
+
+    analysis_output.results = {};
+
+    var prop_access_descrs = [];
+    for (var loc in profile$prop_access_absvals)
+        prop_access_descrs.push(profile$prop_access_absvals[loc]);
+    prop_access_descrs.sort(function (x,y) { return (x.accesses > y.accesses) ? 1 : -1; });
+
+    for (var j=0; j<prop_access_descrs.length; j++)
+    { var descr = prop_access_descrs[j];
+      analysis_output.results[descr.loc] =
+        {
+            absval: profile$absval_to_array(descr.absval),
+            count: descr.accesses
+        };
+    }
+
+    profile$output = new profile$String_output_port();
+    profile$print(JSON.stringify(analysis_output));
+    return profile$output.get_output_string();
+}
+
+function profile$report_old()
+{
     var fn_descrs = [];
-    for (var loc in profile$fn_abstypes)
-        fn_descrs.push(profile$fn_abstypes[loc]);
+    for (var loc in profile$fn_absvals)
+        fn_descrs.push(profile$fn_absvals[loc]);
     fn_descrs.sort(function (x,y) { return (x.calls > y.calls) ? 1 : -1; });
 
     var prop_access_descrs = [];
-    for (var loc in profile$prop_access_abstypes)
-        prop_access_descrs.push(profile$prop_access_abstypes[loc]);
+    for (var loc in profile$prop_access_absvals)
+        prop_access_descrs.push(profile$prop_access_absvals[loc]);
     prop_access_descrs.sort(function (x,y) { return (x.accesses > y.accesses) ? 1 : -1; });
 
     var log = profile$output.get_output_string();
@@ -449,10 +538,10 @@ function profile$report()
       for (var i=0; i<descr.args.length; i++)
       {
           profile$print("     arg[" + i + "] = " +
-                        profile$abstype_to_string(descr.args[i]));
+                        profile$absval_to_string(descr.args[i]));
       }
       profile$print("     result = " +
-                    profile$abstype_to_string(descr.result));
+                    profile$absval_to_string(descr.result));
       profile$print("");
     }
 
@@ -460,7 +549,7 @@ function profile$report()
     profile$print("");
     for (var j=0; j<prop_access_descrs.length; j++)
     { var descr = prop_access_descrs[j];
-      profile$print(descr.accesses + " " + "(" + descr.loc + ":) " + profile$abstype_to_string(descr.abstype));
+      profile$print(descr.accesses + " " + "(" + descr.loc + ":) " + profile$absval_to_string(descr.absval));
       profile$print("");
     }
 
@@ -717,7 +806,7 @@ function profile$Function()
 
 Function = profile$Function;
 
-var profile$document_write_orig = document.write;
+var profile$document_write_orig = (profile$document === undefined) ? undefined : profile$document.write;
 var profile$document_write_called = false;
 
 function profile$document_write(s)
@@ -748,30 +837,35 @@ function profile$send_document_write(text)
     }
 }
 
-document.write = profile$document_write;
+if (profile$document !== undefined)
+    profile$document.write = profile$document_write;
 
 function profile$access_prop_tp(loc, obj)
 {
-    var descr = profile$prop_access_abstypes[loc];
+    var descr = profile$prop_access_absvals[loc];
     if (descr === undefined)
     { descr = { loc: loc,
                 accesses: 0,
-                abstype: undefined
+                absval: undefined
               };
-      profile$prop_access_abstypes[loc] = descr;
+      profile$prop_access_absvals[loc] = descr;
     }
     descr.accesses++;
-    descr.abstype = profile$abstype_add(descr.abstype, obj);
+    descr.absval = profile$absval_add(descr.absval, obj);
 }
 
-function profile$fetch_store_prop(loc, obj, prop, val)
+function profile$fetch_store_prop(loc, obj, prop, exec)
 {
-    profile$log(loc + ": fetch/store " + object_familiar_name(obj) + "." + prop + " = " + val);
+    var result;
+    profile$log(loc + ": fetch/store " + object_familiar_name(obj) + "." + prop + " = ?");
     if (profile$is_object(obj))
     {
         profile$fetch_prop_aux(loc, obj, prop);
-        profile$store_prop_aux(loc, obj, prop, val);
+        result = profile$store_prop_aux(loc, obj, prop, exec);
     }
+    else
+        result = exec();
+    return result;
 }
 
 function profile$fetch_prop(loc, obj, prop)
@@ -781,11 +875,15 @@ function profile$fetch_prop(loc, obj, prop)
         profile$fetch_prop_aux(loc, obj, prop);
 }
 
-function profile$store_prop(loc, obj, prop, val)
+function profile$store_prop(loc, obj, prop, exec)
 {
-    profile$log(loc + ": store " + object_familiar_name(obj) + "." + prop + " = " + val);
+    var result;
+    profile$log(loc + ": store " + object_familiar_name(obj) + "." + prop + " = ?");
     if (profile$is_object(obj))
-        profile$store_prop_aux(loc, obj, prop, val);
+        result = profile$store_prop_aux(loc, obj, prop, exec);
+    else
+        result = exec();
+    return result;
 }
 
 function profile$fetch_prop_aux(loc, obj, prop)
@@ -802,7 +900,7 @@ function profile$fetch_prop_aux(loc, obj, prop)
     }
 }
 
-function profile$store_prop_aux(loc, obj, prop, val)
+function profile$store_prop_aux(loc, obj, prop, exec)
 {
     profile$store_counter++;
     profile$access_prop_tp(loc, obj);
@@ -818,6 +916,7 @@ function profile$store_prop_aux(loc, obj, prop, val)
         profile$miss_counter++;
         profile$map_cache[loc] = info.map;
     }
+    return exec();
 }
 
 function profile$get_prop(loc, obj, prop)
@@ -838,30 +937,22 @@ function profile$get_prop(loc, obj, prop)
 
 function profile$put_prop_preinc(loc, obj, prop)
 {
-    var result = ++obj[prop];
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return ++obj[prop]; });
 }
 
 function profile$put_prop_predec(loc, obj, prop)
 {
-    var result = --obj[prop];
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return --obj[prop]; });
 }
 
 function profile$put_prop_postinc(loc, obj, prop)
 {
-    var result = obj[prop]++;
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return obj[prop]++; });
 }
 
 function profile$put_prop_postdec(loc, obj, prop)
 {
-    var result = obj[prop]--;
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return obj[prop]++; });
 }
 
 function profile$put_prop(loc, obj, prop, val)
@@ -884,9 +975,7 @@ function profile$put_prop(loc, obj, prop, val)
 
         val = profile$send_innerHTML(val, mode);
     }
-    var result = obj[prop] = val;
-    profile$store_prop(loc, obj, prop, result);
-    return result;
+    return profile$store_prop(loc, obj, prop, function () { return obj[prop] = val; });
 }
 
 function profile$put_prop_add(loc, obj, prop, val)
@@ -912,78 +1001,57 @@ function profile$put_prop_add(loc, obj, prop, val)
     if (is_innerHTML) {
         result = obj["proxy$innerHTML_orig"];
     }
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return result; });///////////////////
 }
 
 function profile$put_prop_sub(loc, obj, prop, val)
 {
-    var result = obj[prop] -= val;
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return obj[prop] -= val; });
 }
 
 function profile$put_prop_mul(loc, obj, prop, val)
 {
-    var result = obj[prop] *= val;
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return obj[prop] *= val; });
 }
 
 function profile$put_prop_div(loc, obj, prop, val)
 {
-    var result = obj[prop] /= val;
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return obj[prop] /= val; });
 }
 
 function profile$put_prop_lsh(loc, obj, prop, val)
 {
-    var result = obj[prop] <<= val;
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return obj[prop] <<= val; });
 }
 
 function profile$put_prop_rsh(loc, obj, prop, val)
 {
-    var result = obj[prop] >>= val;
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return obj[prop] >>= val; });
 }
 
 function profile$put_prop_ursh(loc, obj, prop, val)
 {
-    var result = obj[prop] >>>= val;
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return obj[prop] >>>= val; });
 }
 
 function profile$put_prop_and(loc, obj, prop, val)
 {
-    var result = obj[prop] &= val;
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return obj[prop] &= val; });
 }
 
 function profile$put_prop_xor(loc, obj, prop, val)
 {
-    var result = obj[prop] ^= val;
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return obj[prop] ^= val; });
 }
 
 function profile$put_prop_ior(loc, obj, prop, val)
 {
-    var result = obj[prop] |= val;
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return obj[prop] |= val; });
 }
 
 function profile$put_prop_mod(loc, obj, prop, val)
 {
-    var result = obj[prop] %= val;
-    profile$fetch_store_prop(loc, obj, prop, result);
-    return result;
+    return profile$fetch_store_prop(loc, obj, prop, function () { return obj[prop] %= val; });
 }
 
 function profile$set_var_preinc(loc, val)
