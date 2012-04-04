@@ -310,7 +310,7 @@ Instrumentation.prototype.processScript = function (data, filename) {
         console.log("'" + data + "'");
         console.log("--------------------");
         if (options.recordSource) {
-            console.log("Data dumped to " + path.join(options.outputDir, options.instOutputDir, filename));
+            console.log("Data dumped to " + path.join(options.outputDir, options.origOutputDir, filename));
         }
         throw e;
     }
