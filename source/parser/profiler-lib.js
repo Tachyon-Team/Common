@@ -241,7 +241,7 @@ function profile$object_info(obj)
     catch (e)
     {
         // TODO: remove this try/catch
-        console.log("this object does not have hasOwnProperty: " + obj);
+        //console.log("this object does not have hasOwnProperty: " + obj);
         info = profile$object_info_get(obj);
     }
     return info;
