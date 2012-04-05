@@ -919,17 +919,24 @@ function profile$store_prop_aux(loc, obj, prop, exec)
     return exec();
 }
 
+function profile$is_dom_node(n) {
+    return n.nodeType !== undefined;
+}
+
 function profile$get_prop(loc, obj, prop)
 {
     profile$fetch_prop(loc, obj, prop);
 
-    if (prop === "innerHTML" && "hasOwnProperty" in obj) {
+    if (prop === "innerHTML" && profile$is_dom_node(obj)) {
         if (obj.hasOwnProperty("proxy$innerHTML_orig")) {
             // Return uninstrumented innerHTML
             prop = "proxy$innerHTML_orig";
         }
     }
-    // if (obj === undefined) console.log("Trying to fetch prop " + prop + " from undefined");
+    if (obj === undefined) {
+        console.log("Trying to fetch prop " + prop + " from undefined at " + loc);
+        console.log("Hash = " + Hash);
+    }
     var v = obj[prop];
     // if (v === undefined) console.log("Failed to read " + prop + " from " + obj);
     return v;
@@ -957,16 +964,13 @@ function profile$put_prop_postdec(loc, obj, prop)
 
 function profile$put_prop(loc, obj, prop, val)
 {
-    if (prop === "innerHTML" && "hasOwnProperty" in obj) {
+    if (prop === "innerHTML" && profile$is_dom_node(obj)) {
         // Save original value to support append
         if (!obj.hasOwnProperty("proxy$innerHTML_orig"))
             Object.defineProperty(obj, "proxy$innerHTML_orig",
                     { enumerable: false, value: val });
         else
             obj["proxy$innerHTML_orig"] = val;
-
-        if (obj.tagName.toLowerCase() === "script") {
-        }
 
         var mode = "html";
         if (obj.tagName.toLowerCase() === "script") {
@@ -980,7 +984,7 @@ function profile$put_prop(loc, obj, prop, val)
 
 function profile$put_prop_add(loc, obj, prop, val)
 {
-    var is_innerHTML = (prop === "innerHTML") && ("hasOwnProperty" in obj);
+    var is_innerHTML = (prop === "innerHTML") && profile$is_dom_node(obj);
     if (is_innerHTML) {
         var innerhtml_orig;
         var mode = "html";
