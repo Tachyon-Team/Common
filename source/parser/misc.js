@@ -60,7 +60,7 @@ if (node_js_mode) {
 function read_file(filename)
 {
     if (node_js_mode) {
-        return fs.readFileSync(filename, 'ascii');
+        return fs.readFileSync(filename, 'utf-8');
     } else {
         return readFile(filename);
     }
@@ -95,12 +95,12 @@ function File_output_port(filename, init)
 
             this.write_char = function (c)
             {
-                this.stream.write(c, 'ascii');
+                this.stream.write(String.fromCharCode.call(null, c), 'utf-8');
             };
 
             this.write_string = function (str)
             {
-                this.stream.write(str, 'ascii');
+                this.stream.write(str, 'utf-8');
             };
 
             this.flush = function ()
