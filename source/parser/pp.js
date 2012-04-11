@@ -1688,7 +1688,7 @@ span.token_else            { font-weight: bold; }\n\
 \n\
 span.unselected {                          }\n\
 span.selected   { color: #f08;             }\n\
-span.lineinfo   { background-color: #eee;  }\n\
+span.lineinfo   { background-color: #eee; color: #000; }\n\
 span.lineno     { background-color: #ccc;  }\n\
 span.linespace  { background-color: white; }\n\
 \n\

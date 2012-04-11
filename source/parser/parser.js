@@ -876,13 +876,13 @@ function Literal_5(p, STRING)
 function Literal_6(p, DIV)
 {
     var regexp = p.scanner.parse_regexp(false);
-    return new RegExpLiteral(DIV.loc, regexp);
+    return new RegExpLiteral(DIV.loc.join(regexp.loc), regexp);
 }
 
 function Literal_7(p, DIVEQUAL)
 {
     var regexp = p.scanner.parse_regexp(true);
-    return new RegExpLiteral(DIV.loc, regexp);
+    return new RegExpLiteral(DIVEQUAL.loc.join(regexp.loc), regexp);
 }
 
 function Property_1(p, IDENT, COLON, AssignmentExpr)

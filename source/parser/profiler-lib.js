@@ -804,6 +804,8 @@ function profile$Function()
     return profile$global_eval(instrumented_expr);
 }
 
+profile$Function.prototype = profile$Function_orig.prototype;
+
 Function = profile$Function;
 
 var profile$document_write_orig = (profile$document === undefined) ? undefined : profile$document.write;

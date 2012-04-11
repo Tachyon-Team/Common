@@ -831,7 +831,10 @@ Scanner.prototype.parse_regexp = function (divequal)
     return {
              regexp: regexp_chars.get_output_string(),
              pattern: pattern_chars.get_output_string(),
-             flags: flags_chars.get_output_string()
+             flags: flags_chars.get_output_string(),
+             loc: new Location(this.port.filename,
+                               start_pos,
+                               this.lookahead_pos(0))
            };
 };
 
