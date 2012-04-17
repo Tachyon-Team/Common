@@ -108,8 +108,8 @@ function defEqualFunc(key1, key2)
     return key1 === key2;
 }
 
-// Initial hash map size
-HashMap.INIT_SIZE = 89;
+// Default initial hash map size
+HashMap.DEFAULT_INIT_SIZE = 89;
 
 // Hash map min and max load factors
 HashMap.MIN_LOAD_NUM = 1;
@@ -126,7 +126,7 @@ HashMap.NOT_FOUND = {};
 /**
 @class Hash map implementation
 */
-function HashMap(hashFunc, equalFunc)
+function HashMap(hashFunc, equalFunc, initSize)
 {
     /**
     Add or change a key-value binding in the map
@@ -230,7 +230,7 @@ function HashMap(hashFunc, equalFunc)
                 if ((this.numItems * HashMap.MIN_LOAD_DENOM <
                      this.numSlots * HashMap.MIN_LOAD_NUM)
                     &&
-                    this.numSlots > HashMap.INIT_SIZE)
+                    this.numSlots > initSize)
                 {
                     this.resize((this.numSlots - 1) >> 1);
                 }
@@ -307,7 +307,7 @@ function HashMap(hashFunc, equalFunc)
     this.clear = function ()
     {
         // Set the initial number of slots
-        this.numSlots = HashMap.INIT_SIZE;
+        this.numSlots = initSize;
 
         // Set the initial array size
         this.array.length = 2 * this.numSlots;
@@ -364,11 +364,14 @@ function HashMap(hashFunc, equalFunc)
                 this.set(oldArray[2 * i], oldArray[2 * i + 1]);     
     };
 
+    if (initSize === undefined)
+        initSize = HashMap.DEFAULT_INIT_SIZE;
+
     /**
     Number of internal array slots
     @field
     */
-    this.numSlots = HashMap.INIT_SIZE;
+    this.numSlots = initSize;
 
     /**
     Internal storage array
