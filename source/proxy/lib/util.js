@@ -1,4 +1,5 @@
 var fs       = require('fs');
+var path     = require('path');
 var http     = require('http');
 var https    = require('https');
 var buffers  = require('buffertools');
@@ -133,38 +134,59 @@ exports.parseURL = function (url, protocol) {
     return urlparts;
 };
 
+function mkdirsSync(dirname, mode) {
+    if (mode === undefined) mode = 0777 ^ process.umask();
+    var paths = [];
+    var d = dirname;
+    while (true) {
+        if (path.existsSync(d)) {
+            var stats = fs.statSync(d);
+            if (stats.isDirectory()) break;
+            throw new Error('Unable to create directory at ' + d);
+        } else {
+            paths.push(d);
+            d = path.dirname(d);
+        }
+    }
+    for (var i = paths.length-1; i >= 0; i--) {
+        fs.mkdirSync(paths[i], mode);
+    }
+}
+exports.mkdirsSync = mkdirsSync;
+
 function recordOutput(data, filename) {
-    var d = options.outputDir;
-    try {
+    var fn = path.join(options.outputDir, filename);
+    var d = path.dirname(fn);
+    if (path.exists(d)) {
         var stat = fs.statSync(d);
         if (!stat.isDirectory()) throw "Output directory exists, but is not a directory";
-    } catch (e) {
-        fs.mkdirSync(d, 0755);
+    } else {
+        mkdirsSync(d);
     }
-    fs.writeFileSync(d + "/" + filename, data);
+    fs.writeFileSync(fn, data);
 }
 exports.recordOutput = recordOutput;
 
 exports.recordSource = function (scriptSource, filename) {
     if (options.recordSource) {
-       recordOutput(scriptSource, filename);
+       recordOutput(scriptSource, path.join(options.origOutputDir, filename));
     }
 };
 
 exports.recordInstrumentedSource = function (scriptSource, filename) {
     if (options.recordInstrumentedSource) {
-       recordOutput(scriptSource, filename);
+       recordOutput(scriptSource, path.join(options.instOutputDir, filename));
     }
 };
 
 exports.recordHTML = function (html, filename) {
     if (options.recordHTML) {
-        recordOutput(html, filename);
+        recordOutput(html, path.join(options.origOutputDir, filename));
     }
 };
 
 exports.recordInstrumentedHTML = function (html, filename) {
     if (options.recordInstrumentedHTML) {
-        recordOutput(html, filename);
+        recordOutput(html, path.join(options.instOutputDir, filename));
     }
 };

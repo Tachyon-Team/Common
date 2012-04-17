@@ -125,7 +125,7 @@ int writeFile(const char* fileName, const char* content)
     }
 }
 
-char* readFile(const char* fileName)
+char* readFile(const char* fileName, size_t *size)
 {
     FILE* inFile = fopen(fileName, "r");
     if (inFile == NULL)
@@ -157,6 +157,8 @@ char* readFile(const char* fileName)
     outStr[strLen] = '\0';
 
     fclose(inFile);
+
+    *size = strLen;
 
     return outStr;
 }
@@ -482,33 +484,6 @@ TachVal callTachyonFFI(
             tachArgs[3],
             tachArgs[4],
             tachArgs[5]
-        );
-        break;
-
-        case 7:
-        retVal = funcPtr(
-            ctxPtr,
-            tachArgs[0],
-            tachArgs[1],
-            tachArgs[2],
-            tachArgs[3],
-            tachArgs[4],
-            tachArgs[5],
-            tachArgs[6]
-        );
-        break;
-
-        case 8:
-        retVal = funcPtr(
-            ctxPtr,
-            tachArgs[0],
-            tachArgs[1],
-            tachArgs[2],
-            tachArgs[3],
-            tachArgs[4],
-            tachArgs[5],
-            tachArgs[6],
-            tachArgs[7]
         );
         break;
 

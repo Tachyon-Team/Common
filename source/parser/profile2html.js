@@ -42,7 +42,7 @@
 
 //=============================================================================
 
-// File: "js2html.js"
+// File: "profile2html.js"
 
 // Copyright (c) 2012 by Marc Feeley, All Rights Reserved.
 
@@ -55,7 +55,6 @@ function main()
                     lineno_width: undefined,
                     page_width: undefined
                   };
-    var input_filenames = [];
     var i = 0;
 
     while (i < args.length)
@@ -71,11 +70,120 @@ function main()
         i++;
     }
 
-    while (i < args.length)
+    if (i < args.length)
     {
-        input_filenames.push(args[i]);
-        i++;
+        var filename = args[i];
+
+        profile2html(JSON.parse(read_file(filename)), options);
     }
+}
+
+function get_input_filenames(analysis_output, options)
+{
+    var results = analysis_output.results;
+    var input_filenames = [];
+    var filenames_seen = {};
+
+    for (var loc in results)
+    {
+        var x = loc_to_Location(loc);
+        if (filenames_seen[x.filename] === undefined)
+        {
+            filenames_seen[x.filename] = true;
+            input_filenames.push(x.filename);
+        }
+    }
+
+    return input_filenames;
+}
+
+function get_css(analysis_output, options)
+{
+    var results = analysis_output.results;
+    var freq_css = [];
+    var counts = [];
+
+    for (var loc in results)
+    {
+        var r = results[loc];
+
+        if (r.count !== undefined)
+            counts.push(r.count);
+    }
+
+    counts.sort(function (x,y) { return (x > y) ? 1 : -1; });
+
+    var hi_freq_count = counts[Math.floor(counts.length * 0.99)];
+
+    for (var loc in results)
+    {
+        var r = results[loc];
+
+        if (r.count !== undefined && r.count > 1)
+        {
+            var id = string_to_id(loc);
+            var x = r.count / hi_freq_count * 0.80;
+            freq_css.push("#" + id + " { background-color: " + frequency_to_color(x) + " }");
+        }
+    }
+
+    return freq_css.join("\n");
+}
+
+function frequency_to_color(x)
+{
+    var n = frequency_colors.length;
+    return frequency_colors[Math.min(n-1,Math.floor(n * x))];
+}
+
+var frequency_colors = ["#dff","#aee","#9db","#4b4","#161"];
+
+function get_js(analysis_output, options)
+{
+    return js_prefix + JSON.stringify(analysis_output) + js_suffix;
+}
+
+var js_prefix = "var analysis_output = "
+
+var js_suffix = ";\n\
+\n\
+function tooltip_info(loc)\n\
+{\n\
+  var results = analysis_output.results;\n\
+  var r = results[loc];\n\
+\n\
+  if (r === undefined)\n\
+    return undefined;\n\
+\n\
+  var info = [];\n\
+\n\
+  var count = r.count;\n\
+\n\
+  if (count !== undefined)\n\
+    info.push('count: ' + count);\n\
+\n\
+  if (r.absval !== undefined)\n\
+  {\n\
+    info.push('absval:')\n\
+    r.absval.forEach(function (x)\n\
+                     {\n\
+                       var m = analysis_output.maps[x];\n\
+                       if (m === undefined)\n\
+                         info.push('&nbsp;&nbsp;' + x);\n\
+                       else\n\
+                         info.push('&nbsp;&nbsp;' + x + ' = ' + m);\n\
+                     });\n\
+  }\n\
+\n\
+  return info.join('<br>\\n');\n\
+}\n\
+";
+
+function profile2html(analysis_output, options)
+{
+    var input_filenames = get_input_filenames(analysis_output, options);
+    var css = get_css(analysis_output, options);
+    var js = get_js(analysis_output, options);
 
     syntax_highlighting(input_filenames,
                         { output_filename:
@@ -91,7 +199,7 @@ function main()
                             ? undefined
                             : options.page_width,
                           full_html:
-                            { css: "", js: "" }
+                            { css: css, js: js }
                         });
 }
 

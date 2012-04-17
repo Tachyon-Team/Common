@@ -875,12 +875,14 @@ function Literal_5(p, STRING)
 
 function Literal_6(p, DIV)
 {
-    return new RegExpLiteral(DIV.loc, p.scanner.parse_regexp(false));
+    var regexp = p.scanner.parse_regexp(false);
+    return new RegExpLiteral(DIV.loc.join(regexp.loc), regexp);
 }
 
 function Literal_7(p, DIVEQUAL)
 {
-    return new RegExpLiteral(DIVEQUAL.loc, p.scanner.parse_regexp(true));
+    var regexp = p.scanner.parse_regexp(true);
+    return new RegExpLiteral(DIVEQUAL.loc.join(regexp.loc), regexp);
 }
 
 function Property_1(p, IDENT, COLON, AssignmentExpr)
@@ -980,6 +982,7 @@ function PrimaryExprNoBrace_4(p, IDENT)
 
 function PrimaryExprNoBrace_5(p, LPAREN, Expr, RPAREN)
 {
+    Expr.loc = LPAREN.loc.join(RPAREN.loc);
     return Expr;
 }
 

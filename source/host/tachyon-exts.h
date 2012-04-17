@@ -61,7 +61,7 @@ char* getArgVal(int argIdx);
 
 int writeFile(const char* fileName, const char* content);
 
-char* readFile(const char* fileName);
+char* readFile(const char* fileName, size_t *size);
 
 char* shellCommand(const char* command);
 

@@ -1040,13 +1040,10 @@ function id_to_string(str)
     return String.fromCharCode.apply(null,chars);
 }
 
-/*
-
-// Not currently used
-
 function loc_to_Location(loc)
 {
     var i = 0;
+    var end = loc.length - 1;
 
     function expect(c)
     {
@@ -1069,14 +1066,17 @@ function loc_to_Location(loc)
         return n;
     }
 
-    var filename = loc.substr(1,i);
+    while (end > 0 && loc.charCodeAt(end) !== DOUBLEQUOTE_CH)
+        end--;
 
     expect(DOUBLEQUOTE_CH);
 
-    while (i < loc.length && loc.charCodeAt(i) !== DOUBLEQUOTE_CH)
-        i++;
+    i = end;
 
     expect(DOUBLEQUOTE_CH);
+
+    var filename = loc.substr(1,end-1);
+
     expect(AT_CH);
 
     var start_line = number();
@@ -1101,8 +1101,6 @@ function loc_to_Location(loc)
                         line_and_column_to_position(end_line, end_column));
 }
 
-*/
-
 function generate_html_listing(input_filenames, options)
 {
     if (options === undefined)
@@ -1122,11 +1120,11 @@ function generate_html_listing(input_filenames, options)
                   : options.lineno_width,
                 page_width:
                   (options.page_width === undefined)
-                  ? 79
+                  ? 80
                   : options.page_width,
                 full_html:
                   (options.full_html === undefined)
-                  ? true
+                  ? undefined
                   : options.full_html,
                 get_insertions:
                   (options.get_insertions === undefined)
@@ -1136,13 +1134,19 @@ function generate_html_listing(input_filenames, options)
 
     var oport = new File_output_port(options.output_filename);
 
-    if (options.full_html)
-        oport.write_string(html_highlighting_prefix);
+    if (options.full_html !== undefined)
+    {
+        oport.write_string(html_highlighting_prefix1);
+        oport.write_string(options.full_html.css);
+        oport.write_string(html_highlighting_prefix2);
+        oport.write_string(options.full_html.js);
+        oport.write_string(html_highlighting_prefix3);
+    }
 
     for (var i=0; i<input_filenames.length; i++)
         generate_html_listing_to_port(input_filenames[i], oport, options);
 
-    if (options.full_html)
+    if (options.full_html !== undefined)
         oport.write_string(html_highlighting_suffix);
 
     oport.close();
@@ -1165,7 +1169,7 @@ function generate_html_listing_to_port(input_filename, oport, options)
 
     if (c >= 0)
     {
-        function start_line()
+        function start_line(line)
         {
             oport.write_string(options.start_line(input_filename, line+1));
         }
@@ -1174,14 +1178,17 @@ function generate_html_listing_to_port(input_filename, oport, options)
         {
             // pad line to page width
 
-            while (column <= options.page_width)
+            if (options.page_width > 0)
             {
-                oport.write_char(32);
-                column++;
+                while (column === 0 || column % options.page_width !== 0)
+                {
+                    oport.write_char(32);
+                    column++;
+                }
             }
         }
 
-        start_line();
+        start_line(line);
 
         while (c >= 0)
         {
@@ -1204,14 +1211,15 @@ function generate_html_listing_to_port(input_filename, oport, options)
             {
                 pad_right();
 
-                oport.write_char(c);
+                oport.write_string("\n");
+                //oport.write_char(c);
 
                 if (c === CR_CH)
                 {
                     c = iport.read_char();
                     if (c === LF_CH)
                     {
-                        oport.write_char(c);
+                        //oport.write_char(c);
                         c = iport.read_char();
                     }
                 }
@@ -1226,13 +1234,26 @@ function generate_html_listing_to_port(input_filename, oport, options)
             }
             else
             {
+                if (options.page_width > 0)
+                {
+                    if (column > 0 && column % options.page_width === 0)
+                    {
+                        oport.write_string("<small><span style=\"color:red;\">&#8617;</span></small>\n") // LEFTWARDS ARROW WITH HOOK
+                        start_line(-1);
+                    }
+                }
+
                 // TODO: should probably escape other characters too
+
                 if (c === LT_CH)
                     oport.write_string("&lt;")
                 else if (c === GT_CH)
                     oport.write_string("&gt;")
+                else if (c === AMPERSAND_CH)
+                    oport.write_string("&amp;")
                 else
                     oport.write_char(c);
+
                 c = iport.read_char();
                 column++;
             }
@@ -1252,12 +1273,23 @@ function syntax_highlighting(input_filenames, options)
         if (lineno_width === 0)
             return "";
 
-        var id = string_to_id("\"" + input_filename + "\"@" + line);
+        var blanks = Array(lineno_width+1).join(" ");
 
-        return "<span class=\"lineinfo\" id=\"" + id + "\">" +
-               "<span class=\"lineno\">" + (Array(lineno_width).join(" ")+line).substr(-lineno_width) + ":</span>" +
-               "<span class=\"linespace\"> </span>" +
-               "</span>";
+        if (line === 0)
+        {
+            return "<span class=\"lineinfo\">" +
+                   "<span class=\"lineno\">" + blanks + " </span>" +
+                   "<span class=\"linespace\"> </span>" +
+                   "</span>";
+        }
+        else
+        {
+            var id = string_to_id("\"" + input_filename + "\"@" + line);
+            return "<span class=\"lineinfo\" id=\"" + id + "\">" +
+                   "<span class=\"lineno\">" + (blanks+line).substr(-lineno_width) + ":</span>" +
+                   "<span class=\"linespace\"> </span>" +
+                   "</span>";
+        }
     }
 
     function get_insertions(input_filename)
@@ -1286,11 +1318,11 @@ function syntax_highlighting(input_filenames, options)
                   : options.lineno_width,
                 page_width:
                   (options.page_width === undefined)
-                  ? 79
+                  ? 80
                   : options.page_width,
                 full_html:
                   (options.full_html === undefined)
-                  ? true
+                  ? undefined
                   : options.full_html,
                 get_insertions:
                   get_insertions
@@ -1346,18 +1378,38 @@ function syntax_highlighting_highlights(input_filename)
 {
     var iport = new File_input_port(input_filename);
     var scanner = new Scanner(iport);
-    var token = scanner.get_token();
+    var tokens = [];
     var highlights = [];
 
-    while (token.cat !== EOI_CAT)
+    var parse_regexp_orig = scanner.parse_regexp;
+    var get_token_orig = scanner.get_token;
+
+    scanner.parse_regexp = function  (divequal)
     {
-        var h = token_highlights[token.cat];
-        if (h !== undefined)
-        {
-            highlights.push({ loc: token.loc, text: " class=\"token_" + h + "\"" });
-        }
-        token = scanner.get_token();
-    }
+        var regexp = parse_regexp_orig.call(scanner, divequal);
+        //tokens[tokens.length-1] = { loc: xxx, cat: xxx };
+        return regexp;
+    };
+
+    scanner.get_token = function ()
+    {
+        var tok = get_token_orig.call(scanner);
+        tokens.push(tok);
+        return tok;
+    };
+
+    var p = new Parser(scanner, false);
+    var ast = p.parse();
+
+    tokens.forEach(function (tok)
+                   {
+                       //print("xxxxxxxxxxxxxxxx "+tok.cat);
+                       var h = token_highlights[tok.cat];
+                       if (h !== undefined)
+                       {
+                           highlights.push({ loc: tok.loc, text: " class=\"token_" + h + "\"" });
+                       }
+                   });
 
     return highlights;
 }
@@ -1548,7 +1600,7 @@ function highlights_to_insertions(highlights)
         var text = sorted_highlights[i].text;
 
         while (stack.length > 0 &&
-               pos_lt(stack[stack.length-1].loc.end_pos, start_pos))
+               !pos_lt(start_pos, stack[stack.length-1].loc.end_pos))
             pop();
 
         stack.push(sorted_highlights[i]);
@@ -1574,7 +1626,7 @@ function pos_lt(pos1, pos2)
             position_to_column(pos1) < position_to_column(pos2));
 }
 
-var html_highlighting_prefix =
+var html_highlighting_prefix1 =
 "<html>\n\
 \n\
 <head>\n\
@@ -1583,70 +1635,73 @@ var html_highlighting_prefix =
 \n\
 /* for syntax highlighting */\n\
 \n\
-span.token_null            { color: blue; }\n\
-span.token_true            { color: blue; }\n\
-span.token_false           { color: blue; }\n\
-span.token_break           { color: blue; }\n\
-span.token_case            { color: blue; }\n\
-span.token_default         { color: blue; }\n\
-span.token_for             { color: blue; }\n\
-span.token_new             { color: blue; }\n\
-span.token_var             { color: blue; }\n\
-span.token_const           { color: blue; }\n\
-span.token_continue        { color: blue; }\n\
-span.token_function        { color: blue; }\n\
-span.token_return          { color: blue; }\n\
-span.token_void            { color: blue; }\n\
-span.token_delete          { color: blue; }\n\
-span.token_if              { color: blue; }\n\
-span.token_this            { color: blue; }\n\
-span.token_do              { color: blue; }\n\
-span.token_while           { color: blue; }\n\
-span.token_in              { color: blue; }\n\
-span.token_instanceof      { color: blue; }\n\
-span.token_typeof          { color: blue; }\n\
-span.token_switch          { color: blue; }\n\
-span.token_with            { color: blue; }\n\
-span.token_reserved        { color: blue; }\n\
-span.token_throw           { color: blue; }\n\
-span.token_try             { color: blue; }\n\
-span.token_catch           { color: blue; }\n\
-span.token_finally         { color: blue; }\n\
-span.token_debugger        { color: blue; }\n\
-span.token_atomic          { color: blue; }\n\
-span.token_future          { color: blue; }\n\
-span.token_class           { color: blue; }\n\
-span.token_enum            { color: blue; }\n\
-span.token_export          { color: blue; }\n\
-span.token_extends         { color: blue; }\n\
-span.token_import          { color: blue; }\n\
-span.token_super           { color: blue; }\n\
-span.token_implements      { color: blue; }\n\
-span.token_interface       { color: blue; }\n\
-span.token_let             { color: blue; }\n\
-span.token_package         { color: blue; }\n\
-span.token_private         { color: blue; }\n\
-span.token_protected       { color: blue; }\n\
-span.token_public          { color: blue; }\n\
-span.token_static          { color: blue; }\n\
-span.token_yield           { color: blue; }\n\
-span.token_else            { color: blue; }\n\
+span.token_null            { font-weight: bold; }\n\
+span.token_true            { font-weight: bold; }\n\
+span.token_false           { font-weight: bold; }\n\
+span.token_break           { font-weight: bold; }\n\
+span.token_case            { font-weight: bold; }\n\
+span.token_default         { font-weight: bold; }\n\
+span.token_for             { font-weight: bold; }\n\
+span.token_new             { font-weight: bold; }\n\
+span.token_var             { font-weight: bold; }\n\
+span.token_const           { font-weight: bold; }\n\
+span.token_continue        { font-weight: bold; }\n\
+span.token_function        { font-weight: bold; }\n\
+span.token_return          { font-weight: bold; }\n\
+span.token_void            { font-weight: bold; }\n\
+span.token_delete          { font-weight: bold; }\n\
+span.token_if              { font-weight: bold; }\n\
+span.token_this            { font-weight: bold; }\n\
+span.token_do              { font-weight: bold; }\n\
+span.token_while           { font-weight: bold; }\n\
+span.token_in              { font-weight: bold; }\n\
+span.token_instanceof      { font-weight: bold; }\n\
+span.token_typeof          { font-weight: bold; }\n\
+span.token_switch          { font-weight: bold; }\n\
+span.token_with            { font-weight: bold; }\n\
+span.token_reserved        { font-weight: bold; }\n\
+span.token_throw           { font-weight: bold; }\n\
+span.token_try             { font-weight: bold; }\n\
+span.token_catch           { font-weight: bold; }\n\
+span.token_finally         { font-weight: bold; }\n\
+span.token_debugger        { font-weight: bold; }\n\
+span.token_atomic          { font-weight: bold; }\n\
+span.token_future          { font-weight: bold; }\n\
+span.token_class           { font-weight: bold; }\n\
+span.token_enum            { font-weight: bold; }\n\
+span.token_export          { font-weight: bold; }\n\
+span.token_extends         { font-weight: bold; }\n\
+span.token_import          { font-weight: bold; }\n\
+span.token_super           { font-weight: bold; }\n\
+span.token_implements      { font-weight: bold; }\n\
+span.token_interface       { font-weight: bold; }\n\
+span.token_let             { font-weight: bold; }\n\
+span.token_package         { font-weight: bold; }\n\
+span.token_private         { font-weight: bold; }\n\
+span.token_protected       { font-weight: bold; }\n\
+span.token_public          { font-weight: bold; }\n\
+span.token_static          { font-weight: bold; }\n\
+span.token_yield           { font-weight: bold; }\n\
+span.token_else            { font-weight: bold; }\n\
 \n\
 /* for selection of AST subtrees */\n\
 \n\
-span.unselected {                     }\n\
-span.selected   { background: yellow; }\n\
-span.lineinfo   { background: #eee;   }\n\
-span.lineno     { background: #ccc;   }\n\
-span.linespace  { background: white;  }\n\
+span.unselected {                          }\n\
+span.selected   { color: #f08;             }\n\
+span.lineinfo   { background-color: #eee; color: #000; }\n\
+span.lineno     { background-color: #ccc;  }\n\
+span.linespace  { background-color: white; }\n\
 \n\
 /* for AST subtree tooltip */\n\
 \n\
 .tooltip {\n\
-        background: #ffd;\n\
+        background-color: #ffd;\n\
         -webkit-box-shadow: 0 0 10px #000;\n\
 }\n\
-\n\
+";
+
+var html_highlighting_prefix2 =
+"\n\
 </style>\n\
 \n\
 <script>\n\
@@ -1808,7 +1863,10 @@ function tooltip_info(loc)\n\
 \n\
   return 'AST subtree location: <code>' + loc + '</code>';\n\
 }\n\
-\n\
+";
+
+var html_highlighting_prefix3 =
+"\n\
 </script>\n\
 \n\
 <script type='text/javascript' src='highlight-hooks.js'></script>\n\

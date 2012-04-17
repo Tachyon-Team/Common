@@ -1,6 +1,8 @@
 var jsdom    = require('jsdom');
+var path     = require('path');
 var HTML5    = require('HTML5');
 var helper   = require('./util');
+var options  = require('./options');
 
 jsdom.defaultDocumentFeatures = {
     FetchExternalResources   : false,
@@ -273,7 +275,7 @@ Instrumentation.prototype.processHTML = function (data, filename) {
     }
 
     var html = applyChanges(changes, data);
-    helper.recordInstrumentedHTML(html, filename + ".instrumented");
+    helper.recordInstrumentedHTML(html, filename);
 
     return html;
 };
@@ -308,7 +310,7 @@ Instrumentation.prototype.processScript = function (data, filename) {
         console.log("'" + data + "'");
         console.log("--------------------");
         if (options.recordSource) {
-            console.log("Data dumped to " + options.outputDir + "/" + filename);
+            console.log("Data dumped to " + path.join(options.outputDir, options.origOutputDir, filename));
         }
         throw e;
     }

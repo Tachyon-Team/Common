@@ -334,9 +334,10 @@ function register_decl(scope, id, is_param)
     // The id is an instance of Token (with cat=IDENT_CAT) or Variable.
     // The scope is an instance of Program, FunctionExpr or CatchPart.
 
+    var v;
     var id_str = id.toString();
-    var v = scope.vars[id_str];
-    if (typeof v === "undefined")
+
+    if (!scope.vars.hasOwnProperty(id_str))
     {
         v = new Variable((id instanceof Token) ? id : id.tok,
                          is_param,
@@ -344,6 +345,9 @@ function register_decl(scope, id, is_param)
                          scope);
         scope.vars[id_str] = v;
     }
+    else
+        v = scope.vars[id_str];
+
     return v;
 };
 
@@ -525,10 +529,8 @@ function resolve_var(scope, id)
     {
         // Check if id is declared in the current scope
 
-        var v = scope.vars[id_str];
-
-        if (typeof v !== "undefined")
-            return v;
+        if (scope.vars.hasOwnProperty(id_str))
+            return scope.vars[id_str];
 
         var parent = scope.parent;
 
@@ -540,7 +542,7 @@ function resolve_var(scope, id)
 
     // Search has stopped at the global scope (a Program node)
 
-    v = new Variable(id, false, false, scope);
+    var v = new Variable(id, false, false, scope);
 
     scope.vars[id_str] = v;
 
@@ -568,9 +570,11 @@ var_resolution_pass_ctx.prototype.walk_statement = function (ast)
 
         function set_special(id)
         {
-            var v = ast.vars[id];
-            if (typeof v !== "undefined")
+            if (ast.vars.hasOwnProperty(id))
+            {
+                var v = ast.vars[id];
                 v.special = id;
+            }
         }
 
         set_special("eval");

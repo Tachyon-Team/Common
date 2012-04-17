@@ -42,6 +42,13 @@
 
 /*===========================================================================*/
 
+/* File: "d8-tachyon-exts.cc", Time-stamp: <2011-03-22 14:23:35 feeley> */
+
+/* Copyright (c) 2010 by Marc Feeley, All Rights Reserved. */
+/* Copyright (c) 2010 by Maxime Chevalier-Boisvert, All Rights Reserved. */
+
+/*===========================================================================*/
+
 /*
  * This file contains the extensions to the D8 executable needed by the
  * Tachyon compiler.  It implements some auxiliary functions, in particular:
@@ -134,19 +141,6 @@
 
 /*---------------------------------------------------------------------------*/
 
-v8::Handle<v8::Value> v8Proxy_hostIs64bit(const v8::Arguments& args)
-{
-    if (args.Length() != 0)
-    {
-        printf("Error in hostIs64bit -- 0 arguments expected\n");
-        exit(1);
-    }
-
-    int is64bit = (sizeof(void*) == 8);
-
-    return v8::Boolean::New(is64bit);
-}
-
 v8::Handle<v8::Value> v8Proxy_writeFile(const v8::Arguments& args)
 {
     if (args.Length() != 2)
@@ -177,30 +171,15 @@ v8::Handle<v8::Value> v8Proxy_readFile(const v8::Arguments& args)
 
     v8::String::Utf8Value fileStrObj(args[0]);  
     const char* fileName = *fileStrObj;
+    size_t size;
 
-    char* outStr = readFile(fileName);
+    char* outStr = readFile(fileName, &size);
 
-    v8::Local<v8::String> v8Str = v8::String::New(outStr);
+    v8::Local<v8::String> v8Str = v8::String::New(outStr, size);
 
     free(outStr);
 
     return v8Str;
-}
-
-v8::Handle<v8::Value> v8Proxy_remove(const v8::Arguments& args)
-{
-    if (args.Length() != 1)
-    {
-        printf("Error in remove -- 1 argument expected\n");
-        exit(1);
-    }
-
-    v8::String::Utf8Value fileStrObj(args[0]);  
-    const char* fileName = *fileStrObj;
-
-    remove(fileName);
-
-    return v8::Undefined();
 }
 
 v8::Handle<v8::Value> v8Proxy_shellCommand(const v8::Arguments& args)
@@ -294,13 +273,9 @@ v8::Handle<v8::Value> v8Proxy_memAllocatedKBs(const v8::Arguments& args)
 /*---------------------------------------------------------------------------*/
 
 // Convert an array of bytes to a value
-template <class T> T arrayToVal(const v8::Handle<v8::Value> value)
+template <class T> T arrayToVal(const v8::Value* arrayVal)
 {
-    const v8::Handle<v8::Array> array = v8::Handle<v8::Array>::Cast(
-        value->ToObject()
-    );
-
-    assert (array->Length() == sizeof(T));
+    const v8::Handle<v8::Object> jsObj = arrayVal->ToObject();
 
     T val;
 
@@ -308,7 +283,15 @@ template <class T> T arrayToVal(const v8::Handle<v8::Value> value)
     {
         uint8_t* bytePtr = (uint8_t*)(&val) + i;
 
-        const v8::Handle<v8::Value> jsVal = array->Get(i);        
+        if (!jsObj->Has(i))
+        {
+            printf("Error in arrayToVal -- array does not match value size\n");
+            printf("Expected size: %i\n", int(sizeof(T)));
+            printf("Failed on index: %i\n", int(i));
+            exit(1);
+        }
+
+        const v8::Handle<v8::Value> jsVal = jsObj->Get(i);        
 
         int intVal = jsVal->Int32Value();
 
@@ -548,48 +531,36 @@ v8::Handle<v8::Value> v8Proxy_getBlockAddr(const v8::Arguments& args)
 // Second arg: string describing return type
 // Third arg: function pointer
 // Fourth arg: context pointer
-// Fifth arg: vector of args to be passed to the function
+// Other args: args to be passed to the function
 v8::Handle<v8::Value> v8Proxy_callTachyonFFI(const v8::Arguments& args)
 {
-    if (args.Length() != 5)
+    const int MIN_ARG_COUNT = 4;
+
+    if (args.Length() < MIN_ARG_COUNT)
     {
-        printf("Error in callTachyonFFI -- 5 or more argument expected\n");
+        printf("Error in callTachyonFFI -- %d or more argument expected\n", MIN_ARG_COUNT);
         exit(1);
     }
 
     //printf("in v8Proxy_callTachyonFFI\n");
 
     // Get the array of argument types
-    const v8::Handle<v8::Array> argTypeArray = v8::Handle<v8::Array>::Cast(
-        args[0]->ToObject()
-    );
+    const v8::Local<v8::Object> argTypeArray = args[0]->ToObject();
 
     // Get the return type string
     v8::String::Utf8Value retTypeStrObj(args[1]);
     const char* retTypeStr = *retTypeStrObj;
 
     // Get the function pointer
-    TACHYON_FPTR funcPtr = arrayToVal<TACHYON_FPTR>(args[2]);
+    TACHYON_FPTR funcPtr = arrayToVal<TACHYON_FPTR>(*args[2]);
     
     //printf("fun ptr = %p\n", (void*)(intptr_t)funcPtr);
 
     // Get the context pointer
-    uint8_t* ctxPtr = arrayToVal<uint8_t*>(args[3]);
-
-    // Get the argument array
-    const v8::Handle<v8::Array> argArray = v8::Handle<v8::Array>::Cast(
-        args[4]->ToObject()
-    );
+    uint8_t* ctxPtr = arrayToVal<uint8_t*>(*args[3]);
 
     // Get the number of call arguments
-    size_t numArgs = argArray->Length();
-
-    // Ensure that there is a type for each argument
-    if (numArgs != argTypeArray->Length())
-    {
-        printf("Error in callTachyonFFI -- argument and type arrays must have the same length\n");
-        exit(1);
-    }
+    size_t numArgs = args.Length() - MIN_ARG_COUNT;
 
     // Allocate memory for the argument data
     uint8_t* argData = new uint8_t[numArgs * sizeof(TachVal)];
@@ -602,7 +573,7 @@ v8::Handle<v8::Value> v8Proxy_callTachyonFFI(const v8::Arguments& args)
     for (size_t i = 0; i < numArgs; ++i)
     {
         // Get the argument object
-        const v8::Handle<v8::Value> arg = argArray->Get(i);
+        const v8::Value* arg = *args[i + MIN_ARG_COUNT];
 
         // If there is no argument type string for this argument
         if (!argTypeArray->Has(i))
@@ -757,11 +728,6 @@ void init_d8_extensions(v8::Handle<v8::ObjectTemplate> global_template)
     initTachyonExts();
 
     global_template->Set(
-        v8::String::New("hostIs64bit"), 
-        v8::FunctionTemplate::New(v8Proxy_hostIs64bit)
-    );
-
-    global_template->Set(
         v8::String::New("writeFile"), 
         v8::FunctionTemplate::New(v8Proxy_writeFile)
     );
@@ -769,11 +735,6 @@ void init_d8_extensions(v8::Handle<v8::ObjectTemplate> global_template)
     global_template->Set(
         v8::String::New("readFile"), 
         v8::FunctionTemplate::New(v8Proxy_readFile)
-    );
-
-    global_template->Set(
-        v8::String::New("remove"), 
-        v8::FunctionTemplate::New(v8Proxy_remove)
     );
 
     global_template->Set(

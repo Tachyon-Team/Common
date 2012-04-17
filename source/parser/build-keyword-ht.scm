@@ -144,7 +144,7 @@
                       (string-append
                        (list->string (map char-upcase (string->list name)))
                        "_CAT")))
-                (print "{ id: \"" name "\", cat: " cat " }"))
+                (print "{ id: \"" name "\", cat: " cat ", enabled: true }"))
               (begin
                 (print "null")))
           (print "\n")
