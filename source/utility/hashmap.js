@@ -156,13 +156,13 @@ function HashMap(hashFunc, equalFunc, initSize)
         this.array[index + 1] = value;
 
         // Increment the number of items stored
-        this.numItems++;
+        this.length++;
 
         // Test if resizing of the hash map is needed
-        // numItems > ratio * numSlots
-        // numItems > num/denom * numSlots 
-        // numItems * denom > numSlots * num
-        if (this.numItems * HashMap.MAX_LOAD_DENOM >
+        // length > ratio * numSlots
+        // length > num/denom * numSlots 
+        // length * denom > numSlots * num
+        if (this.length * HashMap.MAX_LOAD_DENOM >
             this.numSlots * HashMap.MAX_LOAD_NUM)
         {
             this.resize(2 * this.numSlots + 1);
@@ -221,13 +221,13 @@ function HashMap(hashFunc, equalFunc, initSize)
                 this.array[curFreeIndex] = HashMap.FREE_KEY;
 
                 // Decrement the number of items stored
-                this.numItems--;
+                this.length--;
 
                 // If we are under the minimum load factor, shrink the internal array
-                // numItems < ratio * numSlots 
-                // numItems < num/denom * numSlots 
-                // numItems * denom < numSlots * num
-                if ((this.numItems * HashMap.MIN_LOAD_DENOM <
+                // length < ratio * numSlots 
+                // length < num/denom * numSlots 
+                // length * denom < numSlots * num
+                if ((this.length * HashMap.MIN_LOAD_DENOM <
                      this.numSlots * HashMap.MIN_LOAD_NUM)
                     &&
                     this.numSlots > initSize)
@@ -317,7 +317,7 @@ function HashMap(hashFunc, equalFunc, initSize)
             this.array[2 * i] = HashMap.FREE_KEY;
 
         // Reset the number of items stored
-        this.numItems = 0;
+        this.length = 0;
     };
 
     /**
@@ -329,7 +329,7 @@ function HashMap(hashFunc, equalFunc, initSize)
 
         newMap.numSlots = this.numSlots;
         newMap.array = this.array.slice(0);
-        newMap.numItems = this.numItems;
+        newMap.length = this.length;
 
         return newMap;
     };
@@ -341,7 +341,7 @@ function HashMap(hashFunc, equalFunc, initSize)
     {
         // Ensure that the new size is valid
         assert (
-            this.numItems <= newSize && Math.floor(newSize) === newSize,
+            this.length <= newSize && Math.floor(newSize) === newSize,
             'cannot resize, more items than new size allows'
         );
 
@@ -356,7 +356,7 @@ function HashMap(hashFunc, equalFunc, initSize)
             this.array[2 * i] = HashMap.FREE_KEY;
 
         // Reset the number of elements stored
-        this.numItems = 0;
+        this.length = 0;
 
         // Re-insert the elements from the old array
         for (var i = 0; i < oldNumSlots; ++i)
@@ -390,7 +390,7 @@ function HashMap(hashFunc, equalFunc, initSize)
     Number of items stored
     @field
     */
-    this.numItems = 0;
+    this.length = 0;
 
     // If no hash function was specified, use the default function
     if (hashFunc === undefined || hashFunc === null)

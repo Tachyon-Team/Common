@@ -85,7 +85,7 @@ Add a value to the set
 HashSet.prototype.add = function (val)
 {
     this.hashMap.set(val, val);
-    this.length = this.hashMap.numItems;
+    this.length = this.hashMap.length;
     return this;
 };
 
@@ -109,7 +109,7 @@ Remove a value from the set
 HashSet.prototype.rem = function (val)
 {
     this.hashMap.rem(val);
-    this.length = this.hashMap.numItems;
+    this.length = this.hashMap.length;
 
     return this;
 };
