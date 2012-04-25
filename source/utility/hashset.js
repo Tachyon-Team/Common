@@ -54,13 +54,13 @@ Copyright (c) 2010 Erick Lavoie, All Rights Reserved
 /**
 @class Set implementation using a hash map
 */
-function HashSet(hashFunc, equalFunc)
+function HashSet(hashFunc, equalFunc, initSize)
 {
     /**
     Internal hash map
     @private
     */
-    this.hashMap = new HashMap(hashFunc, equalFunc);
+    this.hashMap = new HashMap(hashFunc, equalFunc, initSize);
 
     /**
     Number of items
