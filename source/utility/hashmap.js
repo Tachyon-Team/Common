@@ -128,244 +128,22 @@ HashMap.NOT_FOUND = {};
 */
 function HashMap(hashFunc, equalFunc, initSize)
 {
-    /**
-    Add or change a key-value binding in the map
-    */
-    this.set = function (key, value)
-    {
-        var index = 2 * (this.hashFunc(key) % this.numSlots);
+    // If no hash function was specified, use the default function
+    if (hashFunc === undefined || hashFunc === null)
+        hashFunc = defHashFunc;
 
-        // Until a free cell is found
-        while (this.array[index] !== HashMap.FREE_KEY)
-        {
-            // If this slot has the item we want
-            if (this.equalFunc(this.array[index], key))
-            {
-                // Set the item's value
-                this.array[index + 1] = value;
-
-                // Exit the function
-                return;
-            }
-
-            index = (index + 2) % this.array.length;
-        }
-    
-        // Insert the new item at the free slot
-        this.array[index] = key;
-        this.array[index + 1] = value;
-
-        // Increment the number of items stored
-        this.length++;
-
-        // Test if resizing of the hash map is needed
-        // length > ratio * numSlots
-        // length > num/denom * numSlots 
-        // length * denom > numSlots * num
-        if (this.length * HashMap.MAX_LOAD_DENOM >
-            this.numSlots * HashMap.MAX_LOAD_NUM)
-        {
-            this.resize(2 * this.numSlots + 1);
-        }
-    };
-
-    /**
-    Remove an item from the map
-    */
-    this.rem = function (key)
-    {    
-        var index = 2 * (this.hashFunc(key) % this.numSlots);
-
-        // Until a free cell is found
-        while (this.array[index] !== HashMap.FREE_KEY)
-        {
-            // If this slot has the item we want
-            if (this.equalFunc(this.array[index], key))
-            {
-                // Initialize the current free index to the removed item index
-                var curFreeIndex = index;
-
-                // For every subsequent item, until we encounter a free slot
-                for (var shiftIndex = (index + 2) % this.array.length;
-                    this.array[shiftIndex] !== HashMap.FREE_KEY;
-                    shiftIndex = (shiftIndex + 2) % this.array.length)
-                {
-                    // Calculate the index at which this item's hash key maps
-                    var origIndex = 2 * (this.hashFunc(this.array[shiftIndex]) % this.numSlots);
-
-                    // Compute the distance from the element to its origin mapping
-                    var distToOrig =
-                        (shiftIndex < origIndex)? 
-                        (shiftIndex + this.array.length - origIndex):
-                        (shiftIndex - origIndex);
-
-                    // Compute the distance from the element to the current free index
-                    var distToFree =
-                        (shiftIndex < curFreeIndex)?
-                        (shiftIndex + this.array.length - curFreeIndex):
-                        (shiftIndex - curFreeIndex);                    
-
-                    // If the free slot is between the element and its origin
-                    if (distToFree <= distToOrig)
-                    {
-                        // Move the item into the free slot
-                        this.array[curFreeIndex] = this.array[shiftIndex];
-                        this.array[curFreeIndex + 1] = this.array[shiftIndex + 1];
-
-                        // Update the current free index
-                        curFreeIndex = shiftIndex;
-                    }
-                }
-
-                // Clear the hash key at the current free position
-                this.array[curFreeIndex] = HashMap.FREE_KEY;
-
-                // Decrement the number of items stored
-                this.length--;
-
-                // If we are under the minimum load factor, shrink the internal array
-                // length < ratio * numSlots 
-                // length < num/denom * numSlots 
-                // length * denom < numSlots * num
-                if ((this.length * HashMap.MIN_LOAD_DENOM <
-                     this.numSlots * HashMap.MIN_LOAD_NUM)
-                    &&
-                    this.numSlots > initSize)
-                {
-                    this.resize((this.numSlots - 1) >> 1);
-                }
-
-                // Item removed
-                return;
-            }
-
-            index = (index + 2) % this.array.length;
-        }
-    };
-
-    /**
-    Get an item in the map
-    */
-    this.get = function (key)
-    {
-        var index = 2 * (this.hashFunc(key) % this.numSlots);
-
-        // Until a free cell is found
-        while (this.array[index] !== HashMap.FREE_KEY)
-        {
-            // If this slot has the item we want
-            if (this.equalFunc(this.array[index], key))
-            {
-                // Return the item's value
-                return this.array[index + 1];
-            }
-
-            index = (index + 2) % this.array.length;
-        }
-    
-        // Return the special not found value
-        return HashMap.NOT_FOUND;
-    };
-
-    /**
-    Test if an item is in the map
-    */
-    this.has = function (key)
-    {
-        return (this.get(key) !== HashMap.NOT_FOUND);
-    };
-
-    /**
-    Get the keys present in the hash map
-    */
-    this.getKeys = function ()
-    {
-        var keys = [];
-
-        for (var i = 0; i < this.numSlots; ++i)
-        {
-            var index = 2 * i;
-
-            if (this.array[index] !== HashMap.FREE_KEY)
-                keys.push(this.array[index]);
-        }
-
-        return keys;
-    };
-
-    /**
-    Get an iterator for this hash map
-    */
-    this.getItr = function ()
-    {
-        return new HashMap.Iterator(this, 0);
-    };
-
-    /**
-    Erase all contained items
-    */
-    this.clear = function ()
-    {
-        // Set the initial number of slots
-        this.numSlots = initSize;
-
-        // Set the initial array size
-        this.array.length = 2 * this.numSlots;
-
-        // Reset each array key element
-        for (var i = 0; i < this.numSlots; ++i)
-            this.array[2 * i] = HashMap.FREE_KEY;
-
-        // Reset the number of items stored
-        this.length = 0;
-    };
-
-    /**
-    Copy the map
-    */
-    this.copy = function ()
-    {
-        var newMap = new HashMap(this.hashFunc, this.equalFunc);
-
-        newMap.numSlots = this.numSlots;
-        newMap.array = this.array.slice(0);
-        newMap.length = this.length;
-
-        return newMap;
-    };
-
-    /**
-    Resize the hash map's internal storage
-    */
-    this.resize = function (newSize)
-    {
-        // Ensure that the new size is valid
-        assert (
-            this.length <= newSize && Math.floor(newSize) === newSize,
-            'cannot resize, more items than new size allows'
-        );
-
-        var oldNumSlots = this.numSlots;
-        var oldArray = this.array;
-
-        // Initialize a new internal array
-        this.array = [];
-        this.numSlots = newSize;
-        this.array.length = 2 * this.numSlots;
-        for (var i = 0; i < this.numSlots; ++i)
-            this.array[2 * i] = HashMap.FREE_KEY;
-
-        // Reset the number of elements stored
-        this.length = 0;
-
-        // Re-insert the elements from the old array
-        for (var i = 0; i < oldNumSlots; ++i)
-            if (oldArray[2 * i] !== HashMap.FREE_KEY)
-                this.set(oldArray[2 * i], oldArray[2 * i + 1]);     
-    };
+    // If no hash function was specified, use the default function
+    if (equalFunc === undefined || equalFunc === null)
+        equalFunc = defEqualFunc;
 
     if (initSize === undefined)
         initSize = HashMap.DEFAULT_INIT_SIZE;
+
+    /**
+    Initial size of this hash map
+    @field
+    */
+    this.initSize = initSize;
 
     /**
     Number of internal array slots
@@ -392,19 +170,11 @@ function HashMap(hashFunc, equalFunc, initSize)
     */
     this.length = 0;
 
-    // If no hash function was specified, use the default function
-    if (hashFunc === undefined || hashFunc === null)
-        hashFunc = defHashFunc;
-
     /**
     Hash function
     @field
     */
     this.hashFunc = hashFunc;
-
-    // If no hash function was specified, use the default function
-    if (equalFunc === undefined || equalFunc === null)
-        equalFunc = defEqualFunc;
 
     /**
     Key equality function
@@ -412,6 +182,242 @@ function HashMap(hashFunc, equalFunc, initSize)
     */
     this.equalFunc = equalFunc;
 }
+
+/**
+Add or change a key-value binding in the map
+*/
+HashMap.prototype.set = function (key, value)
+{
+    var index = 2 * (this.hashFunc(key) % this.numSlots);
+
+    // Until a free cell is found
+    while (this.array[index] !== HashMap.FREE_KEY)
+    {
+        // If this slot has the item we want
+        if (this.equalFunc(this.array[index], key))
+        {
+            // Set the item's value
+            this.array[index + 1] = value;
+
+            // Exit the function
+            return;
+        }
+
+        index = (index + 2) % this.array.length;
+    }
+
+    // Insert the new item at the free slot
+    this.array[index] = key;
+    this.array[index + 1] = value;
+
+    // Increment the number of items stored
+    this.length++;
+
+    // Test if resizing of the hash map is needed
+    // length > ratio * numSlots
+    // length > num/denom * numSlots 
+    // length * denom > numSlots * num
+    if (this.length * HashMap.MAX_LOAD_DENOM >
+        this.numSlots * HashMap.MAX_LOAD_NUM)
+    {
+        this.resize(2 * this.numSlots + 1);
+    }
+};
+
+/**
+Remove an item from the map
+*/
+HashMap.prototype.rem = function (key)
+{    
+    var index = 2 * (this.hashFunc(key) % this.numSlots);
+
+    // Until a free cell is found
+    while (this.array[index] !== HashMap.FREE_KEY)
+    {
+        // If this slot has the item we want
+        if (this.equalFunc(this.array[index], key))
+        {
+            // Initialize the current free index to the removed item index
+            var curFreeIndex = index;
+
+            // For every subsequent item, until we encounter a free slot
+            for (var shiftIndex = (index + 2) % this.array.length;
+                this.array[shiftIndex] !== HashMap.FREE_KEY;
+                shiftIndex = (shiftIndex + 2) % this.array.length)
+            {
+                // Calculate the index at which this item's hash key maps
+                var origIndex = 2 * (this.hashFunc(this.array[shiftIndex]) % this.numSlots);
+
+                // Compute the distance from the element to its origin mapping
+                var distToOrig =
+                    (shiftIndex < origIndex)? 
+                    (shiftIndex + this.array.length - origIndex):
+                    (shiftIndex - origIndex);
+
+                // Compute the distance from the element to the current free index
+                var distToFree =
+                    (shiftIndex < curFreeIndex)?
+                    (shiftIndex + this.array.length - curFreeIndex):
+                    (shiftIndex - curFreeIndex);                    
+
+                // If the free slot is between the element and its origin
+                if (distToFree <= distToOrig)
+                {
+                    // Move the item into the free slot
+                    this.array[curFreeIndex] = this.array[shiftIndex];
+                    this.array[curFreeIndex + 1] = this.array[shiftIndex + 1];
+
+                    // Update the current free index
+                    curFreeIndex = shiftIndex;
+                }
+            }
+
+            // Clear the hash key at the current free position
+            this.array[curFreeIndex] = HashMap.FREE_KEY;
+
+            // Decrement the number of items stored
+            this.length--;
+
+            // If we are under the minimum load factor, shrink the internal array
+            // length < ratio * numSlots 
+            // length < num/denom * numSlots 
+            // length * denom < numSlots * num
+            if ((this.length * HashMap.MIN_LOAD_DENOM <
+                 this.numSlots * HashMap.MIN_LOAD_NUM)
+                &&
+                this.numSlots > this.initSize)
+            {
+                this.resize((this.numSlots - 1) >> 1);
+            }
+
+            // Item removed
+            return;
+        }
+
+        index = (index + 2) % this.array.length;
+    }
+};
+
+/**
+Get an item in the map
+*/
+HashMap.prototype.get = function (key)
+{
+    var index = 2 * (this.hashFunc(key) % this.numSlots);
+
+    // Until a free cell is found
+    while (this.array[index] !== HashMap.FREE_KEY)
+    {
+        // If this slot has the item we want
+        if (this.equalFunc(this.array[index], key))
+        {
+            // Return the item's value
+            return this.array[index + 1];
+        }
+
+        index = (index + 2) % this.array.length;
+    }
+
+    // Return the special not found value
+    return HashMap.NOT_FOUND;
+};
+
+/**
+Test if an item is in the map
+*/
+HashMap.prototype.has = function (key)
+{
+    return (this.get(key) !== HashMap.NOT_FOUND);
+};
+
+/**
+Get the keys present in the hash map
+*/
+HashMap.prototype.getKeys = function ()
+{
+    var keys = [];
+
+    for (var i = 0; i < this.numSlots; ++i)
+    {
+        var index = 2 * i;
+
+        if (this.array[index] !== HashMap.FREE_KEY)
+            keys.push(this.array[index]);
+    }
+
+    return keys;
+};
+
+/**
+Get an iterator for this hash map
+*/
+HashMap.prototype.getItr = function ()
+{
+    return new HashMap.Iterator(this, 0);
+};
+
+/**
+Erase all contained items
+*/
+HashMap.prototype.clear = function ()
+{
+    // Set the initial number of slots
+    this.numSlots = this.initSize;
+
+    // Set the initial array size
+    this.array.length = 2 * this.numSlots;
+
+    // Reset each array key element
+    for (var i = 0; i < this.numSlots; ++i)
+        this.array[2 * i] = HashMap.FREE_KEY;
+
+    // Reset the number of items stored
+    this.length = 0;
+};
+
+/**
+Copy the map
+*/
+HashMap.prototype.copy = function ()
+{
+    var newMap = new HashMap(this.hashFunc, this.equalFunc);
+
+    newMap.numSlots = this.numSlots;
+    newMap.array = this.array.slice(0);
+    newMap.length = this.length;
+
+    return newMap;
+};
+
+/**
+Resize the hash map's internal storage
+*/
+HashMap.prototype.resize = function (newSize)
+{
+    // Ensure that the new size is valid
+    assert (
+        this.length <= newSize && Math.floor(newSize) === newSize,
+        'cannot resize, more items than new size allows'
+    );
+
+    var oldNumSlots = this.numSlots;
+    var oldArray = this.array;
+
+    // Initialize a new internal array
+    this.array = [];
+    this.numSlots = newSize;
+    this.array.length = 2 * this.numSlots;
+    for (var i = 0; i < this.numSlots; ++i)
+        this.array[2 * i] = HashMap.FREE_KEY;
+
+    // Reset the number of elements stored
+    this.length = 0;
+
+    // Re-insert the elements from the old array
+    for (var i = 0; i < oldNumSlots; ++i)
+        if (oldArray[2 * i] !== HashMap.FREE_KEY)
+            this.set(oldArray[2 * i], oldArray[2 * i + 1]);     
+};
 
 /**
 @class Hash map iterator
