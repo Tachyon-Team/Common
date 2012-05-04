@@ -734,6 +734,16 @@ function is_assign_op1(op)
            op === "x --";
 }
 
+function is_pure_op1(op)
+{
+    return op === "void x" ||
+           op === "typeof x" ||
+           op === "+ x" ||
+           op === "- x" ||
+           op === "~ x" ||
+           op === "! x";
+}
+
 function is_assign_op2(op)
 {
     return op === "x = y" ||
@@ -748,6 +758,34 @@ function is_assign_op2(op)
            op === "x ^= y" ||
            op === "x |= y" ||
            op === "x %= y";
+}
+
+function is_pure_op2(op)
+{
+    return op === "x * y" ||
+           op === "x / y" ||
+           op === "x % y" ||
+           op === "x + y" ||
+           op === "x - y" ||
+           op === "x << y" ||
+           op === "x >> y" ||
+           op === "x >>> y" ||
+           op === "x < y" ||
+           op === "x > y" ||
+           op === "x <= y" ||
+           op === "x >= y" ||
+           op === "x instanceof y" ||
+           op === "x in y" ||
+           op === "x == y" ||
+           op === "x != y" ||
+           op === "x === y" ||
+           op === "x !== y" ||
+           op === "x & y" ||
+           op === "x ^ y" ||
+           op === "x | y" ||
+           op === "x && y" ||
+           op === "x || y" ||
+           op === "x , y";
 }
 
 profiling_pass_ctx.prototype.walk_expr = function (ast)
@@ -905,6 +943,11 @@ profiling_pass_ctx.prototype.walk_expr = function (ast)
             }
         }
 
+        return this.call_hook("profile$op",
+                              ast.loc,
+                              ast_walk_expr(ast, this));
+
+        //////////////////////
         return ast_walk_expr(ast, this);
     }
     else if (ast instanceof NewExpr)

@@ -1974,11 +1974,14 @@ function tooltip_info(loc)\n\
     info.push('absval:')\n\
     r.absval.forEach(function (x)\n\
                      {\n\
-                       var m = analysis_output.maps[x];\n\
+                       var name = x.name;\n\
+                       var prop = Math.round(x.count * 100 / count);\n\
+                       var prefix = '&nbsp;&nbsp;' + prop + '%&nbsp;';\n\
+                       var m = analysis_output.maps[name];\n\
                        if (m === undefined)\n\
-                         info.push('&nbsp;&nbsp;' + x);\n\
+                         info.push(prefix + name);\n\
                        else\n\
-                         info.push('&nbsp;&nbsp;' + x + ' = ' + m);\n\
+                         info.push(prefix + name + ' = ' + m);\n\
                      });\n\
   }\n\
 \n\
