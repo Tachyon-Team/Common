@@ -460,7 +460,7 @@ function profile$absval_to_array(absval)
     return arr;
 }
 
-function profile$report()
+function profile$get_profile()
 {
     var analysis_output = {};
 
@@ -492,6 +492,13 @@ function profile$report()
             count: descr.accesses
         };
     }
+
+    return analysis_output;
+}
+
+function profile$report()
+{
+    var analysis_output = profile$get_profile();
 
     profile$output = new profile$String_output_port();
     profile$print(JSON.stringify(analysis_output));
@@ -806,7 +813,7 @@ function profile$Function()
 
 profile$Function.prototype = profile$Function_orig.prototype;
 
-Function = profile$Function;
+//Function = profile$Function;
 
 var profile$document_write_orig = (profile$document === undefined) ? undefined : profile$document.write;
 var profile$document_write_called = false;

@@ -43,6 +43,8 @@
 
 
 OPT_OUTPUT=""
+OPT_PROFILE=""
+OPT_HTML=""
 OPT_LINENO_WIDTH=""
 OPT_PAGE_WIDTH=""
 LAST_FILE=""
@@ -56,6 +58,8 @@ while [ "$1" != "" ]; do
   case "$1" in
         "-output") shift
                    OPT_OUTPUT="-output $1" ;;
+       "-profile") OPT_PROFILE="-profile" ;;
+          "-html") OPT_HTML="-html" ;;
   "-lineno-width") shift
                    OPT_LINENO_WIDTH="-lineno-width $1" ;;
     "-page-width") shift
@@ -73,7 +77,11 @@ while [ "$1" != "" ]; do
 done
 
 if [ "$OPT_OUTPUT" == "" ]; then
-  OPT_OUTPUT="-output $LAST_FILE.html"
+  if [ "$OPT_PROFILE" == "" ]; then
+    OPT_OUTPUT="-output $LAST_FILE.html"
+  else
+    OPT_OUTPUT="-output $LAST_FILE.profile"
+  fi
 fi
 
-$JSPROFILE $OPT_OUTPUT $OPT_LINENO_WIDTH $OPT_PAGE_WIDTH $FILES
+$JSPROFILE $OPT_OUTPUT $OPT_PROFILE $OPT_HTML $OPT_LINENO_WIDTH $OPT_PAGE_WIDTH $FILES

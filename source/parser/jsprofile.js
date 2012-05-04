@@ -61,6 +61,8 @@ function main()
 {
     var args = command_line();
     var options = { output: undefined,
+                    profile: false,
+                    html: false,
                     lineno_width: undefined,
                     page_width: undefined
                   };
@@ -82,6 +84,10 @@ function main()
     {
         if (args[i] === "-output")
             options.output = args[++i];
+        else if (args[i] === "-profile")
+            options.profile = true;
+        else if (args[i] === "-html")
+            options.html = true;
         else if (args[i] === "-lineno-width")
             options.lineno_width = Number(args[++i]);
         else if (args[i] === "-page-width")
@@ -90,6 +96,9 @@ function main()
             break;
         i++;
     }
+
+    if (!options.profile && !options.html)
+        options.html = true;
 
     while (i < args.length)
     {
@@ -117,7 +126,26 @@ function main()
 
         geval(js_to_string(normalized_prog));
 
-        profile2html(profile$get_profile(), options);
+        var analysis_output = profile$get_profile();
+
+        if (options.profile)
+        {
+            var output_filename =
+                  (options.output_filename === undefined)
+                  ? input_filenames[input_filenames.length-1] + ".profile"
+                  : options.output_filename;
+
+            var oport = new File_output_port(output_filename);
+
+            oport.write_string(JSON.stringify(analysis_output));
+
+            oport.close();
+        }
+
+        if (options.html)
+        {
+            profile2html(analysis_output, options);
+        }
     }
 }
 
