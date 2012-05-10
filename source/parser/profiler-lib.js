@@ -556,6 +556,7 @@ function profile$get_profile()
         };
     }
 
+    /*
     for (var loc in profile$prop_op_absvals)
     { var absval = profile$prop_op_absvals[loc];
       var arr = profile$absval_to_array(absval);
@@ -568,6 +569,7 @@ function profile$get_profile()
             count: c
         };
     }
+    */
 
     return analysis_output;
 }
@@ -658,7 +660,7 @@ function profile$nest(loc, enter, debug, fn)
         var prefix = "";
         if (level > 9) { prefix = "|["+level+"] "; level = 8; }
         while (level-- > 0) prefix = "|  " + prefix;
-        profile$log(prefix+(enter?"((":"))")+" "+loc+": "+fn);
+        if (profile$loggingEnabled) profile$log(prefix+(enter?"((":"))")+" "+loc+": "+fn);
     }
 }
 
@@ -942,7 +944,7 @@ function profile$access_prop_tp(loc, obj)
 function profile$fetch_store_prop(loc, obj, prop, exec)
 {
     var result;
-    profile$log(loc + ": fetch/store " + object_familiar_name(obj) + "." + prop + " = ?");
+    if (profile$loggingEnabled) profile$log(loc + ": fetch/store " + object_familiar_name(obj) + "." + prop + " = ?");
     if (profile$is_object(obj))
     {
         profile$fetch_prop_aux(loc, obj, prop);
@@ -955,7 +957,7 @@ function profile$fetch_store_prop(loc, obj, prop, exec)
 
 function profile$fetch_prop(loc, obj, prop)
 {
-    profile$log(loc + ": fetch " + object_familiar_name(obj) + "." + prop);
+    if (profile$loggingEnabled) profile$log(loc + ": fetch " + object_familiar_name(obj) + "." + prop);
     if (profile$is_object(obj))
         profile$fetch_prop_aux(loc, obj, prop);
 }
@@ -963,7 +965,7 @@ function profile$fetch_prop(loc, obj, prop)
 function profile$store_prop(loc, obj, prop, exec)
 {
     var result;
-    profile$log(loc + ": store " + object_familiar_name(obj) + "." + prop + " = ?");
+    if (profile$loggingEnabled) profile$log(loc + ": store " + object_familiar_name(obj) + "." + prop + " = ?");
     if (profile$is_object(obj))
         result = profile$store_prop_aux(loc, obj, prop, exec);
     else
@@ -1264,7 +1266,7 @@ function profile$loc_absval_add(loc, val)
 
 function profile$call_prop(loc, obj, prop)
 {
-    profile$log(loc + ": call " + object_familiar_name(obj) + "." + prop);
+    if (profile$loggingEnabled) profile$log(loc + ": call " + object_familiar_name(obj) + "." + prop);
     if (profile$is_object(obj))
         profile$fetch_prop_aux(loc, obj, prop);
 //    if (obj === undefined) {
