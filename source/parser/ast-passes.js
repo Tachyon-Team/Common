@@ -1146,6 +1146,79 @@ function free_var_pass(ast, options)
 
 //-----------------------------------------------------------------------------
 
+// Module wrapper pass
+
+var BUILTIN_NAMES = [
+    "Object",
+    "Function",
+    "Array",
+    "String",
+    "Boolean",
+    "Number",
+    "Date",
+    "RegExp",
+    "Error",
+    "EvalError",
+    "RangeError",
+    "ReferenceError",
+    "SyntaxError",
+    "TypeError",
+    "URIError",
+    "Math",
+    "arguments",
+    "undefined"
+];
+
+// Module wrapping transformation.
+//
+// Converts an AST to a module by using the "function expression as a module"
+// pattern for better encapsulation.
+
+function module_wrapper_pass(ast, options) {
+    if (options.module) {
+        // Wrap AST in an anonymous function :
+        /*
+         * (function (exports) {
+         *    ... original AST ...
+         * })(this.NAME = {});
+         */
+        var statements = ast.block.statements;
+
+        // Create the anonymous function
+        var param_id = new Token(IDENT_CAT, "exports", ast.loc);
+        var fn_expr = new FunctionExpr(ast.loc, null, [param_id], statements);
+        //Remove variable declarations for builtins to avoid shadowing the
+        //true definitions with undefined.
+        fn_expr.vars = ast.vars;
+        ast.vars = null;
+        for (var v in fn_expr.vars)
+        {
+            if (v === "exports" || BUILTIN_NAMES.indexOf(v) >= 0)
+            {
+                delete fn_expr.vars[v];
+            }
+        }
+
+        // Create the 'this.NAME = {}' expression to be used
+        // as actual
+        var empty_obj = new ObjectLiteral(ast.loc, []);
+        var module_name = new OpExpr(ast.loc, "x [ y ]", [
+            new This(ast.loc),
+            new Literal(ast.loc, options.module)
+        ]);
+        var assignment = new OpExpr(ast.loc, "x = y", [module_name, empty_obj]);
+
+        // Create the call to the anonymous function
+        var args = [assignment];
+        var call_expr = new CallExpr(ast.loc, fn_expr, args);
+
+        // Replace the program body with the call
+        ast.block.statements = [new ExprStatement(ast.loc, call_expr)];
+    }
+}
+
+//-----------------------------------------------------------------------------
+
 function ast_normalize(ast, options)
 {
     if (options === true || options === false || options === undefined) // support old interface
@@ -1159,12 +1232,14 @@ function ast_normalize(ast, options)
     if (!("warn" in options)) options.warn = false;
     if (!("ast" in options)) options.ast = false;
     if (!("nojs" in options)) options.nojs = false;
+    if (!("module" in options)) options.module = undefined;
 
     simplification_pass(ast, options);
     var_resolution_pass(ast, options);
     profiling_pass(ast, options);
     renaming_pass(ast, options);
     free_var_pass(ast, options);
+    module_wrapper_pass(ast, options);
 
     return ast;
 }

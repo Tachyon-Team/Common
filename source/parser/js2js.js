@@ -60,7 +60,8 @@ function main()
                     warn: false,
                     ast: false,
                     nojs: false,
-                    simplify: true
+                    simplify: true,
+                    module: undefined
                   };
     var i = 0;
 
@@ -82,6 +83,8 @@ function main()
             options.nojs = true;
         else if (args[i] === "-raw")
             options.simplify = false;
+        else if (args[i] === "-module")
+            options.module = args[++i];
         else
             break;
         i++;

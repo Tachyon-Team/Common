@@ -49,7 +49,7 @@
 //=============================================================================
 
 /* support node.js as an alternative to our V8 extensions */
-var node_js_mode = (typeof exports !== "undefined");
+var node_js_mode = (typeof module !== 'undefined' && module.exports);
 var fs;
 if (node_js_mode) {
     fs = require('fs');
@@ -141,7 +141,7 @@ function String_input_port(content, filename)
 {
     if (filename === undefined)
         filename = '<string>';
-if (content.length > 0 && content.charCodeAt(content.length-1) !== 10) content = content + "\n";
+    if (content.length > 0 && content.charCodeAt(content.length-1) !== 10) content = content + "\n";
     this.filename = filename;
     this.content = content;
     this.pos = 0;
@@ -240,13 +240,52 @@ function parse_src_port(port, params)
     return normalized_ast;
 }
 
+function instrument_js(sourceCode, options) {
+    if (options === undefined) options = {};
+    if (options.filename === undefined)
+    {
+        options.filename = "<unknown>";
+    }
+    var port = new String_input_port(sourceCode, options.filename);
+    return instrument_port(port);
+}
+
+function instrument_port(port, options) {
+    var prog = null;
+
+    if (options === undefined) options = {};
+    if (options.transform === undefined)
+    {
+        options.transform = function (ast) {
+            return ast_normalize(ast, options);
+        };
+    }
+    if (options.filename === undefined)
+    {
+        options.filename = "<unknown>";
+    }
+
+    var s = new Scanner(port);
+    var p = new Parser(s, options.warn);
+    prog = p.parse();
+
+    if (prog !== null)
+    {
+        var normalized_prog = options.transform(prog);
+        return js_to_string(normalized_prog);
+    }
+}
+
 //=============================================================================
 
 // Node.js support
-if (node_js_mode)
+if (typeof exports !== "undefined")
 {
     exports.String_input_port = String_input_port;
     exports.String_output_port = String_output_port;
     exports.File_input_port = File_input_port;
     exports.File_output_port = File_output_port;
+    exports.instrument_js = instrument_js;
+    exports.instrument = instrument_js;
+    exports.instrument_port = instrument_port;
 }

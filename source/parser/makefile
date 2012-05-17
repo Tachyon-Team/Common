@@ -98,7 +98,10 @@ parser-tables.js: $(GRAMMAR).y.js
 	sed -n '/var action_table =/,$$p' $(GRAMMAR).y.js > parser-tables.js
 
 js2js-lib.js: ../utility/debug.js ../utility/system.js ../utility/hashmap.js ../utility/num.js misc.js scanner.js parser.js pp.js ast-passes.js
-	./js2js -namespace "js2js$$" -export exports ../utility/debug.js ../utility/system.js ../utility/hashmap.js ../utility/num.js misc.js scanner.js parser.js pp.js ast-passes.js > js2js-lib.js
+	./js2js -namespace "js2js$$" -export exports ../utility/debug.js ../utility/system.js ../utility/hashmap.js ../utility/num.js misc.js scanner.js parser.js pp.js ast-passes.js > $@
+
+js2js-mod.js: ../utility/debug.js ../utility/system.js ../utility/hashmap.js ../utility/num.js misc.js scanner.js parser.js pp.js ast-passes.js
+	./js2js -export exports -module js2js ../utility/debug.js ../utility/system.js ../utility/hashmap.js ../utility/num.js misc.js scanner.js parser.js pp.js ast-passes.js > $@
 
 bootstrap:
 	time ./js2scm -exe ../utility/debug.js ../utility/system.js ../utility/hashmap.js ../utility/num.js misc.js scanner.js parser.js pp.js ast-passes.js js.js
