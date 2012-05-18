@@ -745,6 +745,18 @@ function ast_to_js(ast, ctx)
             js_out("}\n", ctx);
         }
     }
+    else if (ast instanceof VariableStatement)
+    {
+        js_indent(ctx);
+        js_out("var ", ctx);
+        for (var i = 0; i < ast.decls.length; i++) {
+            if (i > 0) {
+                js_out(", ", ctx);
+            }
+            ast_to_js(ast.decls[i], ctx);
+        }
+        js_out(";\n", ctx);
+    }
     // else if (ast instanceof CatchPart)
     // { impossible due to handling of TryStatement }
     else if (ast instanceof DebuggerStatement)
@@ -881,6 +893,15 @@ function ast_to_js(ast, ctx)
     else if (ast instanceof This)
     {
         js_out("this", ctx);
+    }
+    else if (ast instanceof Decl)
+    {
+        js_out(js_id_to_js(ast.id.toString()), ctx);
+        if (ast.initializer)
+        {
+            js_out("=", ctx);
+            ast_to_js(ast.initializer, ctx);
+        }
     }
     else
     {

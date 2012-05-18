@@ -247,7 +247,7 @@ function instrument_js(sourceCode, options) {
         options.filename = "<unknown>";
     }
     var port = new String_input_port(sourceCode, options.filename);
-    return instrument_port(port);
+    return instrument_port(port, options);
 }
 
 function instrument_port(port, options) {
